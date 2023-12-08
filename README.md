@@ -9,3 +9,6 @@
 ## Tensorboard
 tensorboard --logdir=runs_g_1p_encoder_mlp --port=8010\
 http://localhost:8010/
+
+## Weights & Biases
+https://wandb.ai/martin-ka/projects
