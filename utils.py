@@ -47,7 +47,7 @@ def load_model(run, particle_dim, particle_index):
     return model
 
 
-def plot_trajectory(actual_data, predicted_data, particle_index, writer=None, epoch=0, dims=3):
+def plot_trajectory(actual_data, predicted_data, particle_index, loggers=[], epoch=0, dims=3):
     fig = plt.figure()
     if dims == 3:  # 3D plot
         ax = fig.add_subplot(111, projection='3d')
@@ -68,9 +68,11 @@ def plot_trajectory(actual_data, predicted_data, particle_index, writer=None, ep
     ax.set_title(f"Trajectory for Particle {particle_index}")
     ax.legend()
 
-    if writer:
-        writer.add_figure('zResults/Trajectory_particle_' + str(particle_index) + '_epoch_' + str(epoch), plt.gcf(),
-                          global_step=epoch)
+    if loggers:
+        fig = plt.gcf()  # Your matplotlib figure
+        tag = f'Trajectory/Particle_{particle_index}_epoch_{epoch}'
+        for logger in loggers:
+            logger.log_figure(tag, fig, epoch)
 
     plt.show()
 
@@ -115,7 +117,7 @@ def calculate_percentage_error(true_data, predicted_data):
     return (mae / magnitude) * 100
 
 
-def plot_error_over_time_position(targets_np, predicted_data, particle_index=None, writer=None, epoch=0, dims=3):
+def plot_error_over_time_position(targets_np, predicted_data, particle_index=None, loggers=[], epoch=0, dims=3):
     if particle_index is not None:
         actual_data = targets_np[:, particle_index, :].reshape(-1, 1, 2 * dims)
     else:
@@ -146,8 +148,13 @@ def plot_error_over_time_position(targets_np, predicted_data, particle_index=Non
     plt.xlabel('Time Step')
     plt.ylabel('Mean absolute Error')
     plt.title('Position MAE')
-    if writer:
-        writer.add_figure('Position/MAE_' + str(epoch), plt.gcf(), global_step=epoch)
+
+    if loggers:
+        fig = plt.gcf()  # Your matplotlib figure
+        tag = f'Position/MAE'
+        for logger in loggers:
+            logger.log_figure(tag, fig, epoch)
+
     plt.show()
 
     ####################################################################################################################
@@ -167,8 +174,13 @@ def plot_error_over_time_position(targets_np, predicted_data, particle_index=Non
     plt.xlabel('Time Step')
     plt.ylabel('Positional MAE as % of Position Magnitude')
     plt.title('Positional Error Percentage Relative to Position Magnitude')
-    if writer:
-        writer.add_figure('PositionError_Percentage' + str(epoch), plt.gcf(), global_step=epoch)
+
+    if loggers:
+        fig = plt.gcf()  # Your matplotlib figure
+        tag = f'Position/Percentage'
+        for logger in loggers:
+            logger.log_figure(tag, fig, epoch)
+
     plt.show()
 
     ####################################################################################################################
@@ -194,12 +206,17 @@ def plot_error_over_time_position(targets_np, predicted_data, particle_index=Non
     plt.xlabel('Time Step')
     plt.ylabel('Positional MAE as % of Velocity L2 Norm')
     plt.title('Positional MAE Percentage Relative to Velocity L2 Norm')
-    if writer:
-        writer.add_figure('PositionalError_VelocityNorm' + str(epoch), plt.gcf(), global_step=epoch)
+
+    if loggers:
+        fig = plt.gcf()  # Your matplotlib figure
+        tag = f'Position/MAE vs L2 velocity'
+        for logger in loggers:
+            logger.log_figure(tag, fig, epoch)
+
     plt.show()
 
 
-def plot_error_over_time_velocity(targets_np, predicted_data, particle_index=None, writer=None, epoch=0, dims=3):
+def plot_error_over_time_velocity(targets_np, predicted_data, particle_index=None, loggers=[], epoch=0, dims=3):
     if particle_index is not None:
         actual_data = targets_np[:, particle_index, :].reshape(-1, 1, 2 * dims)
     else:
@@ -224,8 +241,13 @@ def plot_error_over_time_velocity(targets_np, predicted_data, particle_index=Non
     plt.xlabel('Time Step')
     plt.ylabel('Mean absolute Error')
     plt.title('Velocity MAE')
-    if writer:
-        writer.add_figure('Velocity/MAE' + str(epoch), plt.gcf(), global_step=epoch)
+
+    if loggers:
+        fig = plt.gcf()  # Your matplotlib figure
+        tag = f'Velocity/MAE'
+        for logger in loggers:
+            logger.log_figure(tag, fig, epoch)
+
     plt.show()
 
     ####################################################################################################################
@@ -245,8 +267,13 @@ def plot_error_over_time_velocity(targets_np, predicted_data, particle_index=Non
     plt.xlabel('Time Step')
     plt.ylabel('Velocity MAE as % of Velocity Magnitude')
     plt.title('Velocity Error Percentage Relative to Velocity Magnitude')
-    if writer:
-        writer.add_figure('VelocityError_Percentage' + str(epoch), plt.gcf(), global_step=epoch)
+
+    if loggers:
+        fig = plt.gcf()  # Your matplotlib figure
+        tag = f'Velocity/Percentage'
+        for logger in loggers:
+            logger.log_figure(tag, fig, epoch)
+
     plt.show()
 
 
@@ -273,7 +300,7 @@ def interactive_trajectory_plot(actual_data, predicted_data, particle_index=None
     actual_line, = ax.plot([], [], 'b-', label='Actual')
     predicted_line, = ax.plot([], [], 'r-', label='Predicted')
     ax.legend()
-
+    ax.set_title('Trajectory of predicted particle' + ('s' if particle_index is None else f' {str(particle_index)}'))
     ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03])
     slider = Slider(ax_slider, 'Time Step', 0, actual_data.shape[0] - 1, valinit=0, valfmt='%0.0f')
 
@@ -315,57 +342,61 @@ def interactive_trajectory_plot(actual_data, predicted_data, particle_index=None
     plt.show(block=True)
 
 
-def interactive_trajectory_plot_all_particles(actual_data, predicted_data, particle_index, boxSize=1, dims=3):
+def interactive_trajectory_plot_all_particles(actual_data, predicted_data, particle_index=None, boxSize=1, dims=3):
     plt.ion()
     fig = plt.figure(figsize=(12, 8))
 
-    # Conditionally set up the subplot for 2D or 3D plotting
     if dims == 3:
         ax = fig.add_subplot(111, projection='3d')
+        ax.set_xlim(-boxSize, boxSize)
+        ax.set_ylim(-boxSize, boxSize)
         ax.set_zlim(-boxSize, boxSize)
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
         ax.set_zlabel('Z')
-    elif dims == 2:
-        ax = fig.add_subplot(111)
     else:
-        raise ValueError("dims must be 2 or 3")
+        ax = fig.add_subplot(111)
+        ax.set_xlim(-boxSize, boxSize)
+        ax.set_ylim(-boxSize, boxSize)
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+
+    ax.set_title('Trajectories of all particles ' + (
+        '' if particle_index is None else f'with predicted particle {str(particle_index)}'))
 
     plt.subplots_adjust(bottom=0.25)
+    actual_lines = [ax.plot([], [], 'b-', label='Actual')[0] for _ in range(actual_data.shape[1])]
+    predicted_line, = ax.plot([], [], 'r-', label='Predicted')
+    from matplotlib.lines import Line2D
+    legend_lines = [Line2D([0], [0], color='blue', label='Actual'), predicted_line]
+    ax.legend(handles=legend_lines)
 
-    ax.set_xlim(-boxSize, boxSize)
-    ax.set_ylim(-boxSize, boxSize)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-
-    # Slider
     ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03])
     slider = Slider(ax_slider, 'Time Step', 0, actual_data.shape[0] - 1, valinit=0, valfmt='%0.0f')
 
-    # Update function for the slider
     def update(val):
         time_step = int(slider.val)
-        window_size = 10
+        window_size = 50
         start_step = max(0, time_step - window_size)
-        ax.clear()
-        ax.set_xlim(-boxSize, boxSize)
-        ax.set_ylim(-boxSize, boxSize)
-        if dims == 3:
-            ax.set_zlim(-boxSize, boxSize)
 
-        for pi in range(actual_data.shape[1]):
-            if dims == 3:
-                ax.plot(actual_data[start_step:time_step + 1, pi, 0],
-                        actual_data[start_step:time_step + 1, pi, 1],
-                        actual_data[start_step:time_step + 1, pi, 2], 'b-')
-                if particle_index is None or pi == particle_index:
-                    ax.plot(predicted_data[start_step:time_step + 1, pi, 0],
-                            predicted_data[start_step:time_step + 1, pi, 1],
-                            predicted_data[start_step:time_step + 1, pi, 2], 'r-')
-            elif dims == 2:
-                ax.plot(actual_data[start_step:time_step + 1, pi, 0],
-                        actual_data[start_step:time_step + 1, pi, 1], 'b-')
-                if particle_index is None or pi == particle_index:
-                    ax.plot(predicted_data[start_step:time_step + 1, pi, 0],
-                            predicted_data[start_step:time_step + 1, pi, 1], 'r-')
+        if dims == 2:
+            for pi in range(actual_data.shape[1]):
+                actual_lines[pi].set_data(actual_data[start_step:time_step + 1, pi, 0],
+                                          actual_data[start_step:time_step + 1, pi, 1])
+
+                if pi == particle_index:
+                    predicted_line.set_data(predicted_data[start_step:time_step + 1, particle_index, 0],
+                                            predicted_data[start_step:time_step + 1, particle_index, 1])
+        if dims == 3:
+            for pi in range(actual_data.shape[1]):
+                actual_lines[pi].set_data(actual_data[start_step:time_step + 1, pi, 0],
+                                          actual_data[start_step:time_step + 1, pi, 1])
+                actual_lines[pi].set_3d_properties(actual_data[start_step:time_step + 1, pi, 2])
+
+                if pi == particle_index:
+                    predicted_line.set_data(predicted_data[start_step:time_step + 1, particle_index, 0],
+                                            predicted_data[start_step:time_step + 1, particle_index, 1])
+                    predicted_line.set_3d_properties(predicted_data[start_step:time_step + 1, particle_index, 2])
 
         fig.canvas.draw_idle()
 
@@ -706,18 +737,9 @@ def process_data(combined_data, dims=3):
     return inputs_np, targets_np
 
 
-def train_model(model, optimizer, criterion, data_loader, num_epochs, old_epoch=0, writer=None, dims=3):
-    if writer is not None:
-        layout = {
-            "Losses": {
-                "Last Losses": ["Multiline", ["Loss/last_both", "Loss/last_pos", "Loss/last_vel"]],
-                "Average Losses": ["Multiline", ["Loss/avg_both", "Loss/avg_pos", "Loss/avg_vel"]],
-                "% Losses": ["Multiline",
-                             ["Loss/perc_pos", "Loss/perc_vel", "Loss/perc_pos_vs_vel_l1", "Loss/perc_pos_vs_vel_l2"]],
-            },
-        }
-        writer.add_custom_scalars(layout)
+def train_model(model, optimizer, criterion, data_loader, num_epochs, old_epoch=0, loggers=[], dims=3):
     try:
+        last_avg_loss = 0
         model.train()
         for epoch in range(old_epoch + 1, old_epoch + num_epochs):
             total_metrics = {
@@ -775,24 +797,26 @@ def train_model(model, optimizer, criterion, data_loader, num_epochs, old_epoch=
                 print(
                     f"Epoch [{epoch + 1}/{num_epochs}], avg_both: {avg_metrics['loss']:.5f}, avg_pos: {avg_metrics['loss_pos']: .5f}, avg_vel: {avg_metrics['loss_vel']: .5f}, perc_pos: {avg_metrics['perc_error_pos']: .5f}%, perc_vel: {avg_metrics['perc_error_vel']: .5f}%")
 
-                if writer is not None:
+                for logger in loggers:
                     # writer.add_scalar('Loss/last_both', total_metrics["loss"], epoch)
-                    writer.add_scalar('Loss/last_pos', loss_pos.item(), epoch)
-                    writer.add_scalar('Loss/last_vel', loss_vel.item(), epoch)
+                    logger.log_scalar('Loss/last_pos', loss_pos.item(), epoch)
+                    logger.log_scalar('Loss/last_vel', loss_vel.item(), epoch)
 
-                    # writer.add_scalar('Loss/avg_both', avg_metrics["loss"], epoch)
-                    writer.add_scalar('Loss/avg_pos', avg_metrics["loss_pos"], epoch)
-                    writer.add_scalar('Loss/avg_vel', avg_metrics["loss_vel"], epoch)
+                    # logger.log_scalar('Loss/avg_both', avg_metrics["loss"], epoch)
+                    logger.log_scalar('Loss/avg_pos', avg_metrics["loss_pos"], epoch)
+                    logger.log_scalar('Loss/avg_vel', avg_metrics["loss_vel"], epoch)
 
-                    writer.add_scalar('Loss/perc_pos', avg_metrics["perc_error_pos"], epoch)
-                    writer.add_scalar('Loss/perc_vel', avg_metrics["perc_error_vel"], epoch)
-                    writer.add_scalar('Loss/perc_pos_vs_vel_l1', avg_metrics["perc_error_pos_vs_vel_l1"], epoch)
-                    writer.add_scalar('Loss/perc_pos_vs_vel_l2', avg_metrics["perc_error_pos_vs_vel_l2"], epoch)
+                    logger.log_scalar('Loss/perc_pos', avg_metrics["perc_error_pos"], epoch)
+                    logger.log_scalar('Loss/perc_vel', avg_metrics["perc_error_vel"], epoch)
+                    logger.log_scalar('Loss/perc_pos_vs_vel_l1', avg_metrics["perc_error_pos_vs_vel_l1"], epoch)
+                    logger.log_scalar('Loss/perc_pos_vs_vel_l2', avg_metrics["perc_error_pos_vs_vel_l2"], epoch)
 
                     for name, weight in model.named_parameters():
-                        writer.add_histogram(f'{name}/weights', weight, epoch)
+                        logger.log_histogram(f'{name}/weights', weight, epoch)
                         if weight.grad is not None:
-                            writer.add_histogram(f'{name}/grads', weight.grad, epoch)
+                            logger.log_histogram(f'{name}/grads', weight.grad, epoch)
+
+                    last_avg_loss = avg_metrics["loss"]
 
 
     except KeyboardInterrupt:
@@ -802,8 +826,107 @@ def train_model(model, optimizer, criterion, data_loader, num_epochs, old_epoch=
         print("An error occurred:", e)
         traceback.print_exc()
 
-    if writer is not None:
-        print("Saving model at the end of training")
-        torch.save(model, os.path.join(writer.get_logdir(), "model.pth"))
+    print("Saving model at the end of training")
+    for logger in loggers:
+        if logger.get_logdir():
+            torch.save(model, os.path.join(logger.get_logdir(), "model.pth"))
 
-    return epoch, loss
+    return epoch, last_avg_loss
+
+
+#TODO 3d dims
+def interactive_trajectory_plot_all_particles(actual_data, predicted_data, particle_index=None, boxSize=1, dims=3,
+                                              offline_plot=False, loggers=[], video_name="trajectories all particles"):
+    import matplotlib
+    og_backend = matplotlib.get_backend()
+    try:
+        if offline_plot:
+            matplotlib.use('Agg')
+        else:
+            try:
+                matplotlib.use('Qt5Agg')
+            except (NameError, KeyError):
+                matplotlib.use('TkAgg')
+
+        skip_steps = 3
+        trace_length = 10
+        plt.ion()
+        fig = plt.figure(figsize=(12, 8))
+
+        ax = fig.add_subplot(111)
+        ax.set_xlim(-boxSize, boxSize)
+        ax.set_ylim(-boxSize, boxSize)
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+
+        ax.set_title('Trajectories of all particles ' + (
+            '' if particle_index is None else f'with predicted particle {str(particle_index)}'))
+
+        plt.subplots_adjust(bottom=0.25)
+        actual_lines = [ax.plot([], [], 'b-', label='Actual')[0] for _ in range(actual_data.shape[1])]
+        predicted_line, = ax.plot([], [], 'r-', label='Predicted')
+        from matplotlib.lines import Line2D
+        legend_lines = [Line2D([0], [0], color='blue', label='Actual'), predicted_line]
+        ax.legend(handles=legend_lines)
+
+        if not offline_plot:
+            ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03])
+            slider = Slider(ax_slider, 'Time Step', 0, actual_data.shape[0] - 1, valinit=0, valfmt='%0.0f')
+
+        def update(val):
+            if offline_plot:
+                time_step = int(val) * skip_steps
+            else:
+                time_step = int(val)
+
+            start_step = max(0, time_step - trace_length)
+
+            for pi in range(actual_data.shape[1]):
+                actual_lines[pi].set_data(actual_data[start_step:time_step + 1, pi, 0],
+                                          actual_data[start_step:time_step + 1, pi, 1])
+
+                if pi == particle_index:
+                    predicted_line.set_data(predicted_data[start_step:time_step + 1, particle_index, 0],
+                                            predicted_data[start_step:time_step + 1, particle_index, 1])
+
+            if offline_plot:
+                return actual_lines + [predicted_line]
+            else:
+                fig.canvas.draw_idle()
+
+        def on_key(event):
+            if event.key == 'left':
+                new_val = max(0, slider.val - 1)
+                slider.set_val(new_val)
+            elif event.key == 'right':
+                new_val = min(actual_data.shape[0] - 1, slider.val + 1)
+                slider.set_val(new_val)
+
+        if offline_plot:
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=True, suffix='.mp4') as temp:
+                from matplotlib.animation import FuncAnimation
+                fps = 20
+                frames = actual_data.shape[0] // skip_steps
+                anim = FuncAnimation(fig, update, frames=frames, blit=True)
+                filename = temp.name
+                anim.save(filename, fps=fps,
+                          extra_args=['-vcodec', 'libx264', '-preset', 'fast', '-crf', '22'])
+
+                for i, logger in enumerate(loggers):
+                    logger.log_video(f"Video/{video_name}", filename)
+
+        else:
+            fig.canvas.mpl_connect('key_press_event', on_key)
+
+            update(0)
+            slider.on_changed(update)
+            plt.show(block=True)
+
+    except KeyboardInterrupt:
+        pass
+
+    except Exception as e:
+        traceback.print_exc()
+
+    matplotlib.use(og_backend)

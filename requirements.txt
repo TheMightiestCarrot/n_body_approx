@@ -7,3 +7,6 @@ tensorboard
 scipy
 PyQt5
 seaborn
+wandb
+moviepy
+imageio
