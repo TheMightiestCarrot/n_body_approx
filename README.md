@@ -13,3 +13,6 @@ http://localhost:8010/
 
 ## Weights & Biases
 https://wandb.ai/martin-ka/projects
+
+https://github.com/TheMightiestCarrot/n_body_approx/assets/68813317/fe1145ba-e814-42fe-bf28-716ca871909d
+
