@@ -5,7 +5,7 @@ import shutil
 
 
 class BaseLogger:
-    def log_scalar(self, tag, value, step):
+    def log_scalar(self, tag, value, step=None):
         raise NotImplementedError
 
     def log_histogram(self, tag, values, step):
@@ -43,7 +43,7 @@ class TensorBoardLogger(BaseLogger):
         }
         self.writer.add_custom_scalars(layout)
 
-    def log_scalar(self, tag, value, step):
+    def log_scalar(self, tag, value, step=None):
         self.writer.add_scalar(tag, value, step)
 
     def log_histogram(self, tag, values, step):
@@ -88,8 +88,11 @@ class WandBLogger(BaseLogger):
         wandb.login(key=apikey)
         self.wandb_run = wandb.init(project=project_name, config=config, name=run_name)
 
-    def log_scalar(self, tag, value, step):
-        self.wandb_run.log({tag: value, 'epoch': step})
+    def log_scalar(self, tag, value, step=None):
+        if step is not None:
+            self.wandb_run.log({tag: value, 'epoch': step})
+        else:
+            self.wandb_run.log({tag: value})
 
     def log_histogram(self, tag, values, step):
         self.wandb_run.log({tag: wandb.Histogram(values.detach().cpu()), 'epoch': step})

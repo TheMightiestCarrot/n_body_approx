@@ -277,69 +277,88 @@ def plot_error_over_time_velocity(targets_np, predicted_data, particle_index=Non
     plt.show()
 
 
-def interactive_trajectory_plot(actual_data, predicted_data, particle_index=None, boxSize=1, dims=3):
-    plt.ion()
-    fig = plt.figure(figsize=(12, 8))
-
-    if dims == 3:
-        ax = fig.add_subplot(111, projection='3d')
-        ax.set_xlim(-boxSize, boxSize)
-        ax.set_ylim(-boxSize, boxSize)
-        ax.set_zlim(-boxSize, boxSize)
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-    else:
-        ax = fig.add_subplot(111)
-        ax.set_xlim(-boxSize, boxSize)
-        ax.set_ylim(-boxSize, boxSize)
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-
-    plt.subplots_adjust(bottom=0.25)
-    actual_line, = ax.plot([], [], 'b-', label='Actual')
-    predicted_line, = ax.plot([], [], 'r-', label='Predicted')
-    ax.legend()
-    ax.set_title('Trajectory of predicted particle' + ('s' if particle_index is None else f' {str(particle_index)}'))
-    ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03])
-    slider = Slider(ax_slider, 'Time Step', 0, actual_data.shape[0] - 1, valinit=0, valfmt='%0.0f')
-
-    def update(val):
-        time_step = int(slider.val)
-        window_size = 50
-        start_step = max(0, time_step - window_size)
+def interactive_trajectory_plot(actual_data, predicted_data, particle_index=None, boxSize=1, dims=3, offline_plot=False):
+    import matplotlib
+    og_backend = matplotlib.get_backend()
+    try:
+        if offline_plot:
+            matplotlib.use('Agg')
+        else:
+            try:
+                matplotlib.use('Qt5Agg')
+            except (NameError, KeyError):
+                matplotlib.use('TkAgg')
+        plt.ion()
+        fig = plt.figure(figsize=(12, 8))
 
         if dims == 3:
-            actual_line.set_data(actual_data[start_step:time_step + 1, particle_index, 0],
-                                 actual_data[start_step:time_step + 1, particle_index, 1])
-            actual_line.set_3d_properties(actual_data[start_step:time_step + 1, particle_index, 2])
-
-            predicted_line.set_data(predicted_data[start_step:time_step + 1, particle_index, 0],
-                                    predicted_data[start_step:time_step + 1, particle_index, 1])
-            predicted_line.set_3d_properties(predicted_data[start_step:time_step + 1, particle_index, 2])
-
-
+            ax = fig.add_subplot(111, projection='3d')
+            ax.set_xlim(-boxSize, boxSize)
+            ax.set_ylim(-boxSize, boxSize)
+            ax.set_zlim(-boxSize, boxSize)
+            ax.set_xlabel('X')
+            ax.set_ylabel('Y')
+            ax.set_zlabel('Z')
         else:
-            actual_line.set_data(actual_data[start_step:time_step + 1, particle_index, 0],
-                                 actual_data[start_step:time_step + 1, particle_index, 1])
-            predicted_line.set_data(predicted_data[start_step:time_step + 1, particle_index, 0],
-                                    predicted_data[start_step:time_step + 1, particle_index, 1])
+            ax = fig.add_subplot(111)
+            ax.set_xlim(-boxSize, boxSize)
+            ax.set_ylim(-boxSize, boxSize)
+            ax.set_xlabel('X')
+            ax.set_ylabel('Y')
 
-        fig.canvas.draw_idle()
+        plt.subplots_adjust(bottom=0.25)
+        actual_line, = ax.plot([], [], 'b-', label='Actual')
+        predicted_line, = ax.plot([], [], 'r-', label='Predicted')
+        ax.legend()
+        ax.set_title(
+            'Trajectory of predicted particle' + ('s' if particle_index is None else f' {str(particle_index)}'))
+        ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03])
+        slider = Slider(ax_slider, 'Time Step', 0, actual_data.shape[0] - 1, valinit=0, valfmt='%0.0f')
 
-    def on_key(event):
-        if event.key == 'left':
-            new_val = max(0, slider.val - 1)
-            slider.set_val(new_val)
-        elif event.key == 'right':
-            new_val = min(actual_data.shape[0] - 1, slider.val + 1)
-            slider.set_val(new_val)
+        def update(val):
+            time_step = int(slider.val)
+            window_size = 50
+            start_step = max(0, time_step - window_size)
 
-    fig.canvas.mpl_connect('key_press_event', on_key)
+            if dims == 3:
+                actual_line.set_data(actual_data[start_step:time_step + 1, particle_index, 0],
+                                     actual_data[start_step:time_step + 1, particle_index, 1])
+                actual_line.set_3d_properties(actual_data[start_step:time_step + 1, particle_index, 2])
 
-    update(0)
-    slider.on_changed(update)
-    plt.show(block=True)
+                predicted_line.set_data(predicted_data[start_step:time_step + 1, particle_index, 0],
+                                        predicted_data[start_step:time_step + 1, particle_index, 1])
+                predicted_line.set_3d_properties(predicted_data[start_step:time_step + 1, particle_index, 2])
+
+
+            else:
+                actual_line.set_data(actual_data[start_step:time_step + 1, particle_index, 0],
+                                     actual_data[start_step:time_step + 1, particle_index, 1])
+                predicted_line.set_data(predicted_data[start_step:time_step + 1, particle_index, 0],
+                                        predicted_data[start_step:time_step + 1, particle_index, 1])
+
+            fig.canvas.draw_idle()
+
+        def on_key(event):
+            if event.key == 'left':
+                new_val = max(0, slider.val - 1)
+                slider.set_val(new_val)
+            elif event.key == 'right':
+                new_val = min(actual_data.shape[0] - 1, slider.val + 1)
+                slider.set_val(new_val)
+
+        fig.canvas.mpl_connect('key_press_event', on_key)
+
+        update(0)
+        slider.on_changed(update)
+        plt.show(block=True)
+
+    except KeyboardInterrupt:
+        pass
+
+    except Exception as e:
+        traceback.print_exc()
+
+    matplotlib.use(og_backend)
 
 
 def interactive_trajectory_plot_all_particles(actual_data, predicted_data, particle_index=None, boxSize=1, dims=3):
@@ -739,6 +758,7 @@ def process_data(combined_data, dims=3):
 
 def train_model(model, optimizer, criterion, data_loader, num_epochs, old_epoch=0, loggers=[], dims=3):
     try:
+        print("training")
         last_avg_loss = 0
         model.train()
         for epoch in range(old_epoch + 1, old_epoch + num_epochs):
@@ -834,9 +854,9 @@ def train_model(model, optimizer, criterion, data_loader, num_epochs, old_epoch=
     return epoch, last_avg_loss
 
 
-#TODO 3d dims
+# TODO 3d dims
 def interactive_trajectory_plot_all_particles(actual_data, predicted_data, particle_index=None, boxSize=1, dims=3,
-                                              offline_plot=False, loggers=[], video_name="trajectories all particles"):
+                                              offline_plot=False, loggers=[], video_tag="trajectories all particles"):
     import matplotlib
     og_backend = matplotlib.get_backend()
     try:
@@ -848,7 +868,7 @@ def interactive_trajectory_plot_all_particles(actual_data, predicted_data, parti
             except (NameError, KeyError):
                 matplotlib.use('TkAgg')
 
-        skip_steps = 3
+        skip_steps = 2
         trace_length = 10
         plt.ion()
         fig = plt.figure(figsize=(12, 8))
@@ -914,7 +934,7 @@ def interactive_trajectory_plot_all_particles(actual_data, predicted_data, parti
                           extra_args=['-vcodec', 'libx264', '-preset', 'fast', '-crf', '22'])
 
                 for i, logger in enumerate(loggers):
-                    logger.log_video(f"Video/{video_name}", filename)
+                    logger.log_video(f"{video_tag}", filename, fps=fps)
 
         else:
             fig.canvas.mpl_connect('key_press_event', on_key)

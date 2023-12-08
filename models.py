@@ -2,7 +2,7 @@ import torch.nn as nn
 
 
 class MLPLayer(nn.Module):
-    def __init__(self, input_dim, hidden_dims, output_dim, activation_fn=nn.Tanh, precision='double'):
+    def __init__(self, input_dim, hidden_dims, output_dim, activation_fn=nn.Tanh, output_act=None, precision='double'):
         super(MLPLayer, self).__init__()
         layers = []
         for hidden_dim in hidden_dims:
@@ -10,6 +10,8 @@ class MLPLayer(nn.Module):
             layers.append(activation_fn())
             input_dim = hidden_dim
         layers.append(nn.Linear(input_dim, output_dim))
+        if output_act is not None:
+            layers.append(output_act())
         self.layers = nn.Sequential(*layers)
         if precision == 'double':
             self.double()
@@ -43,12 +45,15 @@ class Encoder(nn.Module):
 
 class EncoderWithMLP(Encoder):
     def __init__(self, particle_dim, model_dim, num_heads, num_layers, particle_index=None,
-                 activation='relu', hparams=None, hidden_dims=None, mlp_act=nn.ReLU, mlp_type='output'):
+                 activation='relu', hparams=None, hidden_dims=None, mlp_act=nn.ReLU, mlp_type='output',
+                 mlp_output_act=None):
         super(EncoderWithMLP, self).__init__(particle_dim, model_dim, num_heads, num_layers, particle_index, activation,
                                              hparams=hparams)
         if mlp_type == 'input':
-            self.input_layer = MLPLayer(model_dim, hidden_dims, particle_dim, activation_fn=mlp_act)
+            self.input_layer = MLPLayer(model_dim, hidden_dims, particle_dim, activation_fn=mlp_act,
+                                        output_act=mlp_output_act)
         elif mlp_type == 'output':
-            self.output_layer = MLPLayer(model_dim, hidden_dims, particle_dim, activation_fn=mlp_act)
+            self.output_layer = MLPLayer(model_dim, hidden_dims, particle_dim, activation_fn=mlp_act,
+                                         output_act=mlp_output_act)
         else:
             raise ValueError(f"Invalid mlp_type: {mlp_type}. Expected 'input' or 'output'.")
