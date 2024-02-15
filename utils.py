@@ -707,7 +707,7 @@ def plot_hist_of_simulation_data(combined_data, dims=3):
         plt.show()
 
 
-def process_data(combined_data, dims=3):
+def process_data(combined_data, dims=3, t_delta=1):
     position_data = combined_data[:, :, :dims]
     velocity_data = combined_data[:, :, dims:]
 
@@ -740,7 +740,7 @@ def process_data(combined_data, dims=3):
     skip_first = 0
     for i in range(skip_first, scaled_combined_data.shape[0] - 1):
         inputs.append(scaled_combined_data[i, :, :])
-        targets.append(scaled_combined_data[i + 1, :, :])
+        targets.append(scaled_combined_data[i + t_delta, :, :])
 
     inputs_np = np.array(inputs)  # Shape: [1000, 100, 6]
     targets_np = np.array(targets)  # Shape: [1000, 100, 6]
