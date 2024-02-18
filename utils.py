@@ -277,7 +277,8 @@ def plot_error_over_time_velocity(targets_np, predicted_data, particle_index=Non
     plt.show()
 
 
-def interactive_trajectory_plot(actual_data, predicted_data, particle_index=None, boxSize=1, dims=3, offline_plot=False):
+def interactive_trajectory_plot(actual_data, predicted_data, particle_index=None, boxSize=1, dims=3,
+                                offline_plot=False):
     import matplotlib
     og_backend = matplotlib.get_backend()
     try:
@@ -738,7 +739,7 @@ def process_data(combined_data, dims=3, t_delta=1):
     targets = []
     # skip first 20 stepov pre istotu nech sa to utrasie
     skip_first = 0
-    for i in range(skip_first, scaled_combined_data.shape[0] - 1):
+    for i in range(skip_first, scaled_combined_data.shape[0] - t_delta):
         inputs.append(scaled_combined_data[i, :, :])
         targets.append(scaled_combined_data[i + t_delta, :, :])
 
@@ -756,7 +757,8 @@ def process_data(combined_data, dims=3, t_delta=1):
     return inputs_np, targets_np
 
 
-def train_model(model, optimizer, criterion, data_loader, num_epochs, old_epoch=0, loggers=[], dims=3):
+def train_model(model, optimizer, criterion, data_loader, num_epochs, old_epoch=0, loggers=[], dims=3,
+                max_batches=None):
     try:
         print("training")
         last_avg_loss = 0
@@ -768,6 +770,9 @@ def train_model(model, optimizer, criterion, data_loader, num_epochs, old_epoch=
             }
             num_batches = 0
             for batch in data_loader:
+                # if (max_batches is not None) and (num_batches > max_batches):
+                #     break
+
                 inputs, targets = batch  # Adjust based on your data loading method
 
                 # Forward pass
@@ -950,3 +955,42 @@ def interactive_trajectory_plot_all_particles(actual_data, predicted_data, parti
         traceback.print_exc()
 
     matplotlib.use(og_backend)
+
+
+from typing import Iterator
+
+import ase
+from ase import visualize
+
+
+def view(atoms: ase.Atom, centre=True):
+    viewer = visualize.view(atoms, viewer='x3d')
+    # if not centre:
+    # nglview.view.center(selection='0')
+    return viewer
+
+
+def inclusive(*args) -> Iterator[int]:
+    """Like range() but inclusive of upper bound and automatically does iteration of ranges with a
+    negative step e.g. 0, -4 will produce a range containing 0, -1, -2, -3, -4"""
+    if len(args) not in (1, 2, 3):
+        raise ValueError('Takes one or two args, got: {}'.format(args))
+
+    if len(args) == 3:
+        # Assume form is start, stop, step
+        start, stop, step = args
+    else:
+        if len(args) == 1:
+            start = 0
+            stop = args[0]
+        else:
+            start = args[0]
+            stop = args[1]
+
+        step = 1 if start <= stop else -1
+
+    sign = 1 if step > 0 else -1
+    idx = start
+    while sign * (stop - idx) >= 0:
+        yield idx
+        idx += step
