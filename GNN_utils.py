@@ -15,7 +15,7 @@ import os
 from tqdm import tqdm
 
 
-def calculate_edge_attr(irreps_edge_attr, edge_vec, max_radius, number_of_basis):
+def calculate_edge_attr_old(irreps_edge_attr, edge_vec, max_radius, number_of_basis):
     edge_sh = o3.spherical_harmonics(irreps_edge_attr, edge_vec, True, normalization='component')
     edge_length = edge_vec.norm(dim=1)
     edge_length_embedded = soft_one_hot_linspace(
@@ -31,7 +31,39 @@ def calculate_edge_attr(irreps_edge_attr, edge_vec, max_radius, number_of_basis)
     return edge_attr, edge_length_embedded
 
 
-def create_fully_connected_data_with_edge_features(node_features, positions, targets, max_radius, num_basis, l_max):
+def calculate_edge_attr(l_max, edge_vec, max_radius, number_of_basis, static_edge_attr=None):
+    """
+        Enriches edge features:
+         - radial basis function of nodal distances
+         - adds spherical harmonics to edge features
+    :param l_max:
+    :param edge_vec:
+    :param max_radius:
+    :param number_of_basis:
+    :param static_edge_attr: additional edge attributes besides the spherical harmonics (bond type)
+    :return:
+    """
+    edge_sh = o3.spherical_harmonics(range(l_max + 1), edge_vec, True, normalization='component')
+    edge_length = edge_vec.norm(dim=1)
+    edge_length_embedded = soft_one_hot_linspace(
+        x=edge_length,
+        start=0.0,
+        end=max_radius,
+        number=number_of_basis,
+        basis='smooth_finite',
+        cutoff=True
+    ).mul(number_of_basis ** 0.5)
+
+    if static_edge_attr is not None:
+        edge_attr = torch.cat([edge_sh, static_edge_attr], dim=1)
+    else:
+        edge_attr = edge_sh
+
+    return edge_attr, edge_length_embedded
+
+
+def create_fully_connected_data_with_edge_features(node_features, positions, targets, max_radius, num_basis,
+                                                   l_max, node_attributes=None, static_edge_attr=None):
     num_nodes = node_features.size(0)
     device = node_features.device
 
@@ -48,15 +80,29 @@ def create_fully_connected_data_with_edge_features(node_features, positions, tar
 
     y = targets.detach().to(device).to(torch.float32)
 
-    irreps_edge_attr = o3.Irreps.spherical_harmonics(lmax=l_max)
-    edge_attr, edge_length_embedded = calculate_edge_attr(irreps_edge_attr, edge_vec, max_radius, num_basis)
+    edge_attr, edge_length_embedded = calculate_edge_attr(l_max, edge_vec, max_radius, num_basis, static_edge_attr)
 
-    return Data(x=node_features, edge_index=edge_index, edge_attr=edge_attr, y=y, edge_vec=edge_vec,
-                pos=positions, edge_length_embedded=edge_length_embedded)
+    data_dict = {
+        'x': node_features,
+        'edge_index': edge_index,
+        'edge_attr': edge_attr,
+        'y': y,
+        'edge_vec': edge_vec,
+        'pos': positions,
+        'edge_length_embedded': edge_length_embedded
+    }
+
+    if node_attributes is not None:
+        data_dict['z'] = node_attributes
+
+    if static_edge_attr is not None:
+        data_dict['static_edge_attr'] = static_edge_attr
+
+    return Data(**data_dict)
 
 
-def create_graph_dataset(inputs_np, targets_np, batch_size=1, dims=3, max_radius=None, num_basis=None, l_max=1,
-                         dtype=torch.float32):
+def create_n_body_graph_dataset(inputs_np, targets_np, batch_size=1, dims=3, max_radius=None, num_basis=None, l_max=1,
+                                dtype=torch.float32):
     inputs_tensor = torch.tensor(inputs_np, dtype=dtype)
     targets_tensor = torch.tensor(targets_np, dtype=dtype)
 
@@ -79,10 +125,11 @@ def create_graph_dataset(inputs_np, targets_np, batch_size=1, dims=3, max_radius
 
 # Equivariance test
 def equivariance_test(model, data_loader):
+    retval = 99999
     training = model.training
     device = next(model.parameters()).device
-    if training:
-        model.eval()
+    # if training:
+    #     model.eval()
 
     try:
         model.to(torch.device("cpu"))
@@ -90,16 +137,27 @@ def equivariance_test(model, data_loader):
         rot = o3.rand_matrix()
         # Wignerove matice tejto rotacie
         D_in = model.irreps_in.D_from_matrix(rot)
+
+        d_edge = o3.Irreps.spherical_harmonics(model.lmax).D_from_matrix(rot)
+
+
         D_out = model.irreps_out.D_from_matrix(rot)
 
         for batch in data_loader:
             # rotate before
             f_in = batch.detach().cpu().clone()
+            btch, node_features, node_attr, edge_src, edge_dst, edge_vec, edge_attr, edge_scalars = model.preprocess(f_in)
 
             # ROTACIA NODALNYCH FICUR
-            f_in.x = f_in.x @ D_in.T
+            f_in.x = node_features @ D_in.T
             # ROTACIA POZICIE (z ktorej sa vyrataju edgeove ficury)
-            f_in.pos = f_in.pos @ rot.T
+            #f_in.z = node_attr @ rot.T
+
+            f_in.edge_attr = edge_attr @ d_edge.T
+
+            #f_in.edge_length_embedded = edge_scalars @ rot.T
+
+            #[mp.irreps_node_input, mp.irreps_node_attr, None, None, mp.irreps_edge_attr, None],
 
             f_before = model(f_in)
             # rotate after
@@ -111,12 +169,16 @@ def equivariance_test(model, data_loader):
 
         print(f_before.abs().mean())
         print((f_after - f_before).abs().mean())
-    except:
+        retval = (f_after - f_before).abs().mean()
+    except Exception as e:
+        print(e)
         pass
 
     if training:
         model.train()
         model.to(device)
+
+    return retval
 
 
 def visualize_layers(model):

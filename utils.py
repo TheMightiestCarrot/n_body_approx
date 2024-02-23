@@ -708,7 +708,7 @@ def plot_hist_of_simulation_data(combined_data, dims=3):
         plt.show()
 
 
-def process_data(combined_data, dims=3, t_delta=1):
+def process_data(combined_data, dims=3, t_delta=1, apply_normalization=True):
     position_data = combined_data[:, :, :dims]
     velocity_data = combined_data[:, :, dims:]
 
@@ -716,17 +716,20 @@ def process_data(combined_data, dims=3, t_delta=1):
     reshaped_position_data = position_data.reshape(-1, position_data.shape[2])
     reshaped_velocity_data = velocity_data.reshape(-1, velocity_data.shape[2])
 
-    # Find global min and max for position data
-    position_min = reshaped_position_data.min()
-    position_max = reshaped_position_data.max()
+    if apply_normalization:
+        position_min = reshaped_position_data.min()
+        position_max = reshaped_position_data.max()
 
-    # Find global min and max for velocity data
-    velocity_min = reshaped_velocity_data.min()
-    velocity_max = reshaped_velocity_data.max()
+        # Find global min and max for velocity data
+        velocity_min = reshaped_velocity_data.min()
+        velocity_max = reshaped_velocity_data.max()
 
-    # Apply min-max scaling
-    scaled_position_data = -1 + 2 * (reshaped_position_data - position_min) / (position_max - position_min)
-    scaled_velocity_data = -1 + 2 * (reshaped_velocity_data - velocity_min) / (velocity_max - velocity_min)
+        # Apply min-max scaling
+        scaled_position_data = -1 + 2 * (reshaped_position_data - position_min) / (position_max - position_min)
+        scaled_velocity_data = -1 + 2 * (reshaped_velocity_data - velocity_min) / (velocity_max - velocity_min)
+    else:
+        scaled_position_data = reshaped_position_data
+        scaled_velocity_data = reshaped_velocity_data
 
     # Reshape scaled data back to original format, if needed
     scaled_position_data = scaled_position_data.reshape(position_data.shape)
@@ -737,7 +740,6 @@ def process_data(combined_data, dims=3, t_delta=1):
 
     inputs = []
     targets = []
-    # skip first 20 stepov pre istotu nech sa to utrasie
     skip_first = 0
     for i in range(skip_first, scaled_combined_data.shape[0] - t_delta):
         inputs.append(scaled_combined_data[i, :, :])
@@ -751,10 +753,12 @@ def process_data(combined_data, dims=3, t_delta=1):
     print("targets_np shape:", targets_np.shape)
 
     plot_hist_of_simulation_data(combined_data, dims=dims)
-    print("Normalized:")
-    plot_hist_of_simulation_data(scaled_combined_data, dims=dims)
+    if apply_normalization:
+        print("Normalized:")
+        plot_hist_of_simulation_data(scaled_combined_data, dims=dims)
 
     return inputs_np, targets_np
+
 
 
 def train_model(model, optimizer, criterion, data_loader, num_epochs, old_epoch=0, loggers=[], dims=3,
@@ -956,41 +960,3 @@ def interactive_trajectory_plot_all_particles(actual_data, predicted_data, parti
 
     matplotlib.use(og_backend)
 
-
-from typing import Iterator
-
-import ase
-from ase import visualize
-
-
-def view(atoms: ase.Atom, centre=True):
-    viewer = visualize.view(atoms, viewer='x3d')
-    # if not centre:
-    # nglview.view.center(selection='0')
-    return viewer
-
-
-def inclusive(*args) -> Iterator[int]:
-    """Like range() but inclusive of upper bound and automatically does iteration of ranges with a
-    negative step e.g. 0, -4 will produce a range containing 0, -1, -2, -3, -4"""
-    if len(args) not in (1, 2, 3):
-        raise ValueError('Takes one or two args, got: {}'.format(args))
-
-    if len(args) == 3:
-        # Assume form is start, stop, step
-        start, stop, step = args
-    else:
-        if len(args) == 1:
-            start = 0
-            stop = args[0]
-        else:
-            start = args[0]
-            stop = args[1]
-
-        step = 1 if start <= stop else -1
-
-    sign = 1 if step > 0 else -1
-    idx = start
-    while sign * (stop - idx) >= 0:
-        yield idx
-        idx += step
