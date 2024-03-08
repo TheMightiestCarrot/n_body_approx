@@ -1,8 +1,8 @@
 numpy
 matplotlib
-torch==2.1.0
-torchvision
-torchaudio
+#torch==2.1.0
+#torchvision
+#torchaudio
 tensorboard
 scipy
 PyQt5
@@ -14,4 +14,4 @@ imageio
 #torch-cluster
 #torch_geometric
 #pip install torch-geometric -f https://data.pyg.org/whl/torch-2.1.0+cpu.html
-e3nn
+#e3nn
