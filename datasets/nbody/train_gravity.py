@@ -1,18 +1,13 @@
-import argparse
-import numpy as np
-import torch
-import os
-import wandb
-from torch import nn, optim
 import time
-from e3nn.o3 import Irreps
-from torch_geometric.data import Data
+
+import torch
+import wandb
 from e3nn.o3 import Irreps, spherical_harmonics
-from torch_scatter import scatter
+from datasets.nbody.dataset_gravity import GravityDataset
+from torch import nn, optim
+from torch_geometric.data import Data
 from torch_geometric.nn import knn_graph
-
-
-from nbody.dataset_gravity import GravityDataset
+from torch_scatter import scatter
 
 time_exp_dic = {'time': 0, 'counter': 0}
 
@@ -77,8 +72,8 @@ def train(gpu, model, args):
         train_loss = run_epoch(model, optimizer, loss_mse, epoch, loader_train, transform, device, args)
         if args.log and gpu == 0:
             wandb.log({"Train MSE": train_loss})
-        if epoch % args.test_interval == 0 or epoch == args.epochs-1:
-            #train(epoch, loader_train, backprop=False)
+        if epoch % args.test_interval == 0 or epoch == args.epochs - 1:
+            # train(epoch, loader_train, backprop=False)
             val_loss = run_epoch(model, optimizer, loss_mse, epoch, loader_val, transform, device, args, backprop=False)
             test_loss = run_epoch(model, optimizer, loss_mse, epoch, loader_test,
                                   transform, device, args, backprop=False)
@@ -137,18 +132,18 @@ def run_epoch(model, optimizer, criterion, epoch, loader, transform, device, arg
             if epoch % 100 == 99:
                 print("Forward average time: %.6f" % (time_exp_dic['time'] / time_exp_dic['counter']))
                 if args.log:
-                    wandb.log({"Time": time_exp_dic['time']/time_exp_dic['counter']})
+                    wandb.log({"Time": time_exp_dic['time'] / time_exp_dic['counter']})
         loss = criterion(pred, graph.y)
         if backprop:
             loss.backward()
             optimizer.step()
-        res['loss'] += loss.item()*batch_size
+        res['loss'] += loss.item() * batch_size
         res['counter'] += batch_size
 
     if not backprop:
         prefix = "==> "
     else:
         prefix = ""
-    print('%s epoch %d avg loss: %.5f' % (prefix+loader.dataset.partition, epoch, res['loss'] / res['counter']))
+    print('%s epoch %d avg loss: %.5f' % (prefix + loader.dataset.partition, epoch, res['loss'] / res['counter']))
 
     return res['loss'] / res['counter']

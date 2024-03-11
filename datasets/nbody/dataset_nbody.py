@@ -11,6 +11,8 @@ class NBodyDataset():
 
     """
 
+    path = osp.join(pathlib.Path(__file__).parent.absolute(), 'dataset', 'charged')
+
     def __init__(self, partition='train', max_samples=1e8, dataset_name="nbody_small"):
         self.partition = partition
         if self.partition == 'val':
@@ -30,11 +32,11 @@ class NBodyDataset():
         self.data, self.edges = self.load()
 
     def load(self):
-        dir = pathlib.Path(__file__).parent.absolute()
-        loc = np.load(osp.join(dir, 'dataset', 'loc_' + self.suffix + '.npy'))
-        vel = np.load(osp.join(dir, 'dataset', 'vel_' + self.suffix + '.npy'))
-        edges = np.load(osp.join(dir, 'dataset', 'edges_' + self.suffix + '.npy'))
-        charges = np.load(osp.join(dir, 'dataset', 'charges_' + self.suffix + '.npy'))
+        root = self.path
+        loc = np.load(osp.join(root, 'loc_' + self.suffix + '.npy'))
+        vel = np.load(osp.join(root, 'vel_' + self.suffix + '.npy'))
+        edges = np.load(osp.join(root, 'edges_' + self.suffix + '.npy'))
+        charges = np.load(osp.join(root, 'charges_' + self.suffix + '.npy'))
 
         loc, vel, edge_attr, edges, charges = self.preprocess(loc, vel, edges, charges)
         return (loc, vel, edge_attr, charges), edges
@@ -48,7 +50,7 @@ class NBodyDataset():
         charges = charges[0:self.max_samples]
         edge_attr = []
 
-        # Initialize edges and edge_attributes
+        # this creates fully connected graph
         rows, cols = [], []
         for i in range(n_nodes):
             for j in range(n_nodes):
@@ -65,6 +67,7 @@ class NBodyDataset():
     def set_max_samples(self, max_samples):
         self.max_samples = int(max_samples)
         self.data, self.edges = self.load()
+
     '''
     def preprocess_old(self, loc, vel, edges, charges):
         # cast to torch and swap n_nodes <--> n_features dimensions
@@ -95,6 +98,8 @@ class NBodyDataset():
         return self.data[0].size(1)
 
     def __getitem__(self, i):
+        """this is being called each time a loader returns some data
+            (if random shuffling is on the 'i' is some random index and this repeats batch times)"""
         loc, vel, edge_attr, charges = self.data
         loc, vel, edge_attr, charges = loc[i], vel[i], edge_attr[i], charges[i]
 

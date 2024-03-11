@@ -11,7 +11,7 @@ from e3nn.o3 import Irreps, spherical_harmonics
 from torch_scatter import scatter
 
 
-from nbody.dataset_nbody import NBodyDataset
+from datasets.nbody.dataset_nbody import NBodyDataset
 
 time_exp_dic = {'time': 0, 'counter': 0}
 
@@ -113,7 +113,7 @@ def run_epoch(model, optimizer, criterion, epoch, loader, transform, device, arg
 
     for batch_idx, data in enumerate(loader):
         data = [d.to(device) for d in data]
-        data = [d.view(-1, d.size(2)) for d in data]
+        data = [d.view(-1, d.size(2)) for d in data] # this changes [batches, nodes, whatever] to [batches x nodes, whatever]
         loc, vel, edge_attr, charges, loc_end = data
 
         optimizer.zero_grad()

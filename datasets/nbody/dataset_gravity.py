@@ -1,10 +1,8 @@
-import numpy as np
-import torch
-import random
 import os.path as osp
 import pathlib
-import os
-from torch_geometric.data import Data
+
+import numpy as np
+import torch
 
 
 class GravityDataset():
@@ -12,8 +10,10 @@ class GravityDataset():
     NBodyDataset
 
     """
+    path = osp.join(pathlib.Path(__file__).parent.absolute(), 'dataset', 'gravity')
 
-    def __init__(self, partition='train', max_samples=1e8, dataset_name="nbody_small", neighbours=6, target="pos"):
+    def __init__(self, partition='train', max_samples=1e8, dataset_name="nbody_small", bodies=5, neighbours=6,
+                 target="pos"):
         self.partition = partition
         if self.partition == 'val':
             self.suffix = 'valid'
@@ -21,9 +21,9 @@ class GravityDataset():
             self.suffix = self.partition
         self.dataset_name = dataset_name
         if dataset_name == "nbody":
-            self.suffix += "_gravity100_initvel1"
+            self.suffix += f"_gravity{str(bodies)}_initvel1"
         elif dataset_name == "nbody_small" or dataset_name == "nbody_small_out_dist":
-            self.suffix += "_gravity100_initvel1small"
+            self.suffix += f"_gravity{str(bodies)}_initvel1small"
         else:
             raise Exception("Wrong dataset name %s" % self.dataset_name)
 
@@ -35,24 +35,23 @@ class GravityDataset():
         self.neighbours = int(neighbours)
         self.target = target
 
-
     def load(self):
-        dir = pathlib.Path(__file__).parent.absolute()
-        loc = np.load(osp.join(dir, 'dataset', 'loc_' + self.suffix + '.npy'))
-        vel = np.load(osp.join(dir, 'dataset', 'vel_' + self.suffix + '.npy'))
-        edges = np.load(osp.join(dir, 'dataset', 'edges_' + self.suffix + '.npy'))
-        charges = np.load(osp.join(dir, 'dataset', 'charges_' + self.suffix + '.npy'))
+
+        loc = np.load(osp.join(self.path, 'loc_' + self.suffix + '.npy'))
+        vel = np.load(osp.join(self.path, 'vel_' + self.suffix + '.npy'))
+        force = np.load(osp.join(self.path, 'edges_' + self.suffix + '.npy'))
+        mass = np.load(osp.join(self.path, 'charges_' + self.suffix + '.npy'))
 
         self.num_nodes = loc.shape[-1]
 
         loc, vel, force, mass = self.preprocess(loc, vel, force, mass)
-        return (loc, vel, force, mass)
+        return (loc, vel, force, mass), None
 
     def preprocess(self, loc, vel, force, mass):
         # cast to torch and swap n_nodes <--> n_features dimensions
-        loc = torch.Tensor(loc).transpose(2, 3)
-        vel = torch.Tensor(vel).transpose(2, 3)
-        force = torch.Tensor(force).transpose(2, 3)
+        # loc = torch.Tensor(loc).transpose(2, 3)
+        # vel = torch.Tensor(vel).transpose(2, 3)
+        # force = torch.Tensor(force).transpose(2, 3)
         loc = loc[0:self.max_samples, :, :, :]  # limit number of samples
         vel = vel[0:self.max_samples, :, :, :]  # speed when starting the trajectory
         force = force[0:self.max_samples, :, :, :]

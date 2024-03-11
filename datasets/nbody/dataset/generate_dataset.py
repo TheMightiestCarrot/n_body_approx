@@ -1,8 +1,11 @@
 from synthetic_sim import ChargedParticlesSim, SpringSim, GravitySim
+from datasets.nbody.dataset_nbody import NBodyDataset
+from datasets.nbody.dataset_gravity import GravityDataset
 import time
 import numpy as np
 import argparse
 import multiprocessing
+import os
 
 """
 nbody_small:   python3 -u generate_dataset.py --simulation=charged --num-train 10000 --seed 43 --suffix small
@@ -11,10 +14,10 @@ gravity_small: python3 -u generate_dataset.py --simulation=gravity --num-train 1
 
 import sys
 
-# sys.argv = [
-#     'generate_dataset.py', '--simulation=gravity', '--num-train=200', '--seed=43',
-#     '--suffix=small', '--num-valid=100', '--num-test=100'
-# ]
+sys.argv = [
+    'generate_dataset.py', '--simulation=charged', '--num-train=10000', '--seed=43',
+    '--suffix=small', '--num-valid=2000', '--num-test=2000'
+]
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--simulation', type=str, default='charged',
@@ -52,16 +55,16 @@ if args.simulation == 'springs':
 elif args.simulation == 'charged':
     sim = ChargedParticlesSim(noise_var=0.0, n_balls=args.n_balls, vel_norm=initial_vel_norm)
     suffix = '_charged'
+    save_path = NBodyDataset.path
 elif args.simulation == 'gravity':
     sim = GravitySim(noise_var=0.0, n_balls=args.n_balls, vel_norm=initial_vel_norm)
     suffix = '_gravity'
+    save_path = GravityDataset.path
 else:
     raise ValueError('Simulation {} not implemented'.format(args.simulation))
 
 suffix += str(args.n_balls) + "_initvel%d" % args.initial_vel + args.suffix
 np.random.seed(args.seed)
-
-print(suffix)
 
 
 def sample_trajectory_wrapper(args):
@@ -91,6 +94,8 @@ def generate_dataset(num_sims, length, sample_freq):
 
 
 if __name__ == "__main__":
+
+    print(save_path)
     print("Generating {} training simulations".format(args.num_train))
     loc_train, vel_train, edges_train, charges_train = generate_dataset(args.num_train,
                                                                         args.length,
@@ -106,17 +111,17 @@ if __name__ == "__main__":
                                                                     args.length_test,
                                                                     args.sample_freq)
 
-    np.save('loc_train' + suffix + '.npy', loc_train)
-    np.save('vel_train' + suffix + '.npy', vel_train)
-    np.save('edges_train' + suffix + '.npy', edges_train)
-    np.save('charges_train' + suffix + '.npy', charges_train)
+    np.save(os.path.join(save_path, 'loc_train' + suffix + '.npy'), loc_train)
+    np.save(os.path.join(save_path, 'vel_train' + suffix + '.npy'), vel_train)
+    np.save(os.path.join(save_path, 'edges_train' + suffix + '.npy'), edges_train)
+    np.save(os.path.join(save_path, 'charges_train' + suffix + '.npy'), charges_train)
 
-    np.save('loc_valid' + suffix + '.npy', loc_valid)
-    np.save('vel_valid' + suffix + '.npy', vel_valid)
-    np.save('edges_valid' + suffix + '.npy', edges_valid)
-    np.save('charges_valid' + suffix + '.npy', charges_valid)
+    np.save(os.path.join(save_path, 'loc_valid' + suffix + '.npy'), loc_valid)
+    np.save(os.path.join(save_path, 'vel_valid' + suffix + '.npy'), vel_valid)
+    np.save(os.path.join(save_path, 'edges_valid' + suffix + '.npy'), edges_valid)
+    np.save(os.path.join(save_path, 'charges_valid' + suffix + '.npy'), charges_valid)
 
-    np.save('loc_test' + suffix + '.npy', loc_test)
-    np.save('vel_test' + suffix + '.npy', vel_test)
-    np.save('edges_test' + suffix + '.npy', edges_test)
-    np.save('charges_test' + suffix + '.npy', charges_test)
+    np.save(os.path.join(save_path, 'loc_test' + suffix + '.npy'), loc_test)
+    np.save(os.path.join(save_path, 'vel_test' + suffix + '.npy'), vel_test)
+    np.save(os.path.join(save_path, 'edges_test' + suffix + '.npy'), edges_test)
+    np.save(os.path.join(save_path, 'charges_test' + suffix + '.npy'), charges_test)
