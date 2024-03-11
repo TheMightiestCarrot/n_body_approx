@@ -1,11 +1,11 @@
 # n_body_approx
-## Files
-[one_particle_withmlp.ipynb](one_particle_withmlp.ipynb) - training, results including models and data are logged into tensorboard \
-[encoder_gravity_analysis.ipynb](encoder_gravity_analysis.ipynb) - analysis of tensorboard run id\
-[gravity_simulator.ipynb](learning_materials/gravity_simulator.ipynb) - simulates and plots particles\
+## Contents
+[set_transformer_one_particle_withmlp_v2.ipynb](set_transformer_one_particle_withmlp_v2.ipynb) - training, results including models and data are logged into tensorboard \
+[set_transformer_encoder_gravity_analysis.ipynb](set_transformer_encoder_gravity_analysis.ipynb) - analysis of tensorboard run id\
+[gravity_simulator.ipynb](learning_materials%2Fgravity_simulator.ipynb) - simulates and plots particles\
 **models.py** - models...\
-**loggers.py** - unified wrapper around various loggers like tensorboard, wandb,...\
-**utils.py** - big box of various tools and stuff
+**utils** - big box of various tools and stuff\
+**utils\loggers.py** - unified wrapper around various loggers like tensorboard, wandb,...\
 
 ## Tensorboard
 tensorboard --logdir=runs_g_1p_encoder_mlp --port=8010\
