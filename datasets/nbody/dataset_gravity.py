@@ -1,4 +1,4 @@
-import os.path as osp
+import os
 import pathlib
 
 import numpy as np
@@ -10,7 +10,8 @@ class GravityDataset():
     NBodyDataset
 
     """
-    path = osp.join(pathlib.Path(__file__).parent.absolute(), 'dataset', 'gravity')
+    path = os.path.join(pathlib.Path(__file__).parent.absolute(), 'dataset', 'gravity')
+    os.makedirs(path, exist_ok=True)
 
     def __init__(self, partition='train', max_samples=1e8, dataset_name="nbody_small", bodies=5, neighbours=6,
                  target="pos"):
@@ -37,10 +38,10 @@ class GravityDataset():
 
     def load(self):
 
-        loc = np.load(osp.join(self.path, 'loc_' + self.suffix + '.npy'))
-        vel = np.load(osp.join(self.path, 'vel_' + self.suffix + '.npy'))
-        force = np.load(osp.join(self.path, 'edges_' + self.suffix + '.npy'))
-        mass = np.load(osp.join(self.path, 'charges_' + self.suffix + '.npy'))
+        loc = np.load(os.path.join(self.path, 'loc_' + self.suffix + '.npy'))
+        vel = np.load(os.path.join(self.path, 'vel_' + self.suffix + '.npy'))
+        force = np.load(os.path.join(self.path, 'edges_' + self.suffix + '.npy'))
+        mass = np.load(os.path.join(self.path, 'charges_' + self.suffix + '.npy'))
 
         self.num_nodes = loc.shape[-1]
 

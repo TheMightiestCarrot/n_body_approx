@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import random
-import os.path as osp
+import os
 import pathlib
 
 
@@ -11,7 +11,8 @@ class NBodyDataset():
 
     """
 
-    path = osp.join(pathlib.Path(__file__).parent.absolute(), 'dataset', 'charged')
+    path = os.path.join(pathlib.Path(__file__).parent.absolute(), 'dataset', 'charged')
+    os.makedirs(path, exist_ok=True)
 
     def __init__(self, partition='train', max_samples=1e8, dataset_name="nbody_small"):
         self.partition = partition
@@ -33,10 +34,10 @@ class NBodyDataset():
 
     def load(self):
         root = self.path
-        loc = np.load(osp.join(root, 'loc_' + self.suffix + '.npy'))
-        vel = np.load(osp.join(root, 'vel_' + self.suffix + '.npy'))
-        edges = np.load(osp.join(root, 'edges_' + self.suffix + '.npy'))
-        charges = np.load(osp.join(root, 'charges_' + self.suffix + '.npy'))
+        loc = np.load(os.path.join(root, 'loc_' + self.suffix + '.npy'))
+        vel = np.load(os.path.join(root, 'vel_' + self.suffix + '.npy'))
+        edges = np.load(os.path.join(root, 'edges_' + self.suffix + '.npy'))
+        charges = np.load(os.path.join(root, 'charges_' + self.suffix + '.npy'))
 
         loc, vel, edge_attr, edges, charges = self.preprocess(loc, vel, edges, charges)
         return (loc, vel, edge_attr, charges), edges
