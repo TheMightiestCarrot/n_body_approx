@@ -43,6 +43,8 @@ def train(gpu, model, args):
     else:
         device = torch.device('cuda:' + str(gpu))
 
+    model = model.to(device)
+
     dataset_train = GravityDataset(partition='train', dataset_name=args.nbody_name,
                                    max_samples=args.max_samples, neighbours=args.neighbours, target=args.target)
     loader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, drop_last=True)
