@@ -110,19 +110,19 @@ if __name__ == "__main__":
     #     '--norm=none', '--batch_size=100', '--gpu=1', '--weight_decay=1e-12', '--target=pos'
     # ]
 
-    sys.argv = [
-        'main.py', '--dataset=gravity', '--epochs=5', '--max_samples=3000',
-        '--model=segnn', '--lmax_h=1', '--lmax_attr=1', '--layers=4',
-        '--hidden_features=64', '--subspace_type=weightbalanced', '--norm=none',
-        '--batch_size=100', '--gpu=1', '--weight_decay=1e-12', '--target=pos'
-    ]
-
     # sys.argv = [
-    #     'main.py', '--dataset=nbody', '--epochs=1000', '--max_samples=3000',
+    #     'main.py', '--dataset=gravity', '--epochs=5', '--max_samples=3000',
     #     '--model=segnn', '--lmax_h=1', '--lmax_attr=1', '--layers=4',
     #     '--hidden_features=64', '--subspace_type=weightbalanced', '--norm=none',
-    #     '--batch_size=100', '--gpu=1', '--weight_decay=1e-12'
+    #     '--batch_size=100', '--gpu=1', '--weight_decay=1e-12', '--target=pos'
     # ]
+
+    sys.argv = [
+        'main.py', '--dataset=nbody', '--epochs=1000', '--max_samples=3000',
+        '--model=segnn', '--lmax_h=1', '--lmax_attr=1', '--layers=4',
+        '--hidden_features=64', '--subspace_type=weightbalanced', '--norm=none',
+        '--batch_size=100', '--gpu=1', '--weight_decay=1e-12'
+    ]
 
     parser = create_argparser()
 

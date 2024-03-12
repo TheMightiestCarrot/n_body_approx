@@ -760,7 +760,6 @@ def process_data(combined_data, dims=3, t_delta=1, apply_normalization=True):
     return inputs_np, targets_np
 
 
-
 def train_model(model, optimizer, criterion, data_loader, num_epochs, old_epoch=0, loggers=[], dims=3,
                 max_batches=None):
     try:
@@ -960,3 +959,206 @@ def interactive_trajectory_plot_all_particles(actual_data, predicted_data, parti
 
     matplotlib.use(og_backend)
 
+
+def interactive_trajectory_plot_all_particles_3d(actual_data, predicted_data, particle_index=None, boxSize=1, dims=3,
+                                                 offline_plot=False, loggers=[],
+                                                 video_tag="trajectories all particles 3D"):
+    import matplotlib
+    from matplotlib.widgets import Slider
+    import traceback
+    og_backend = matplotlib.get_backend()
+    try:
+        if offline_plot:
+            matplotlib.use('Agg')
+        else:
+            try:
+                matplotlib.use('Qt5Agg')
+            except (NameError, KeyError):
+                matplotlib.use('TkAgg')
+
+        skip_steps = 2
+        trace_length = 1
+        plt.ion()
+        fig = plt.figure(figsize=(12, 8))
+
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_xlim(-boxSize, boxSize)
+        ax.set_ylim(-boxSize, boxSize)
+        ax.set_zlim(-boxSize, boxSize)
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
+        ax.set_title('3D Trajectories of all particles ' + (
+            '' if particle_index is None else f'with predicted particle {str(particle_index)}'))
+
+        plt.subplots_adjust(bottom=0.25)
+        actual_lines = [ax.plot([], [], [], 'b-', label='Actual')[0] for _ in range(actual_data.shape[1])]
+        predicted_line, = ax.plot([], [], [], 'r-', label='Predicted')
+        from matplotlib.lines import Line2D
+        legend_lines = [Line2D([0], [0], color='blue', lw=2, label='Actual'),
+                        Line2D([0], [0], color='red', lw=2, label='Predicted')]
+        ax.legend(handles=legend_lines)
+
+        if not offline_plot:
+            ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03])
+            slider = Slider(ax_slider, 'Time Step', 0, actual_data.shape[0] - 1, valinit=0, valfmt='%0.0f')
+
+        def on_key(event):
+            if event.key == 'left':
+                new_val = max(0, slider.val - 1)
+                slider.set_val(new_val)
+            elif event.key == 'right':
+                new_val = min(actual_data.shape[0] - 1, slider.val + 1)
+                slider.set_val(new_val)
+
+        def update(val):
+            if offline_plot:
+                time_step = int(val) * skip_steps
+            else:
+                time_step = int(val)
+
+            start_step = max(0, time_step - trace_length)
+
+            for pi in range(actual_data.shape[1]):
+                actual_lines[pi].set_data(actual_data[start_step:time_step + 1, pi, 0],
+                                          actual_data[start_step:time_step + 1, pi, 1])
+                actual_lines[pi].set_3d_properties(actual_data[start_step:time_step + 1, pi, 2])
+
+                if pi == particle_index:
+                    predicted_line.set_data(predicted_data[start_step:time_step + 1, particle_index, 0],
+                                            predicted_data[start_step:time_step + 1, particle_index, 1])
+                    predicted_line.set_3d_properties(predicted_data[start_step:time_step + 1, particle_index, 2])
+
+            if offline_plot:
+                return actual_lines + [predicted_line]
+            else:
+                fig.canvas.draw_idle()
+
+        if not offline_plot:
+            fig.canvas.mpl_connect('key_press_event', on_key)
+
+            def on_key(event):
+                if event.key == 'left':
+                    new_val = max(0, slider.val - 1)
+                    slider.set_val(new_val)
+                elif event.key == 'right':
+                    new_val = min(actual_data.shape[0] - 1, slider.val + 1)
+                    slider.set_val(new_val)
+
+            update(0)
+            slider.on_changed(update)
+            plt.show(block=True)
+
+        if offline_plot:
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=True, suffix='.mp4') as temp:
+                from matplotlib.animation import FuncAnimation
+                fps = 20
+                frames = actual_data.shape[0] // skip_steps
+                anim = FuncAnimation(fig, update, frames=frames, blit=False)
+                filename = temp.name
+                anim.save(filename, fps=fps,
+                          extra_args=['-vcodec', 'libx264', '-preset', 'fast', '-crf', '22'])
+
+                for i, logger in enumerate(loggers):
+                    logger.log_video(f"{video_tag}", filename, fps=fps)
+
+    except KeyboardInterrupt:
+        pass
+
+
+def interactive_trajectory_plot_all_particles_3d_tracelesss(actual_data, predicted_data, particle_index=None, boxSize=1, dims=3,
+                                                 offline_plot=False, loggers=[],
+                                                 video_tag="trajectories all particles 3D"):
+    import matplotlib
+    from matplotlib.widgets import Slider
+    import traceback
+    og_backend = matplotlib.get_backend()
+    try:
+        if offline_plot:
+            matplotlib.use('Agg')
+        else:
+            try:
+                matplotlib.use('Qt5Agg')
+            except (NameError, KeyError):
+                matplotlib.use('TkAgg')
+
+        skip_steps = 2
+        plt.ion()
+        fig = plt.figure(figsize=(12, 8))
+
+        ax = fig.add_subplot(111, projection='3d')
+        ax.set_xlim(-boxSize, boxSize)
+        ax.set_ylim(-boxSize, boxSize)
+        ax.set_zlim(-boxSize, boxSize)
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
+        ax.set_title('3D Trajectories of all particles ' + (
+            '' if particle_index is None else f'with predicted particle {str(particle_index)}'))
+
+        plt.subplots_adjust(bottom=0.25)
+        actual_lines = [ax.plot([], [], [], 'b-', label='Actual')[0] for _ in range(actual_data.shape[1])]
+        predicted_line, = ax.plot([], [], [], 'r-', label='Predicted')
+        from matplotlib.lines import Line2D
+        legend_lines = [Line2D([0], [0], color='blue', lw=2, label='Actual'),
+                        Line2D([0], [0], color='red', lw=2, label='Predicted')]
+        ax.legend(handles=legend_lines)
+
+        if not offline_plot:
+            ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03])
+            slider = Slider(ax_slider, 'Time Step', 0, actual_data.shape[0] - 1, valinit=0, valfmt='%0.0f')
+
+        def on_key(event):
+            if event.key == 'left':
+                new_val = max(0, slider.val - 1)
+                slider.set_val(new_val)
+            elif event.key == 'right':
+                new_val = min(actual_data.shape[0] - 1, slider.val + 1)
+                slider.set_val(new_val)
+
+        def update(val):
+            if offline_plot:
+                time_step = int(val) * skip_steps
+            else:
+                time_step = int(val)
+
+            for pi in range(actual_data.shape[1]):
+                # Only plot the current time_step's data
+                actual_lines[pi].set_data(actual_data[time_step, pi, 0], actual_data[time_step, pi, 1])
+                actual_lines[pi].set_3d_properties(actual_data[time_step, pi, 2])
+
+                if pi == particle_index:
+                    predicted_line.set_data(predicted_data[time_step, particle_index, 0],
+                                            predicted_data[time_step, particle_index, 1])
+                    predicted_line.set_3d_properties(predicted_data[time_step, particle_index, 2])
+
+            if offline_plot:
+                return actual_lines + [predicted_line]
+            else:
+                fig.canvas.draw_idle()
+
+        if not offline_plot:
+            fig.canvas.mpl_connect('key_press_event', on_key)
+            update(0)
+            slider.on_changed(update)
+            plt.show(block=True)
+
+        if offline_plot:
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=True, suffix='.mp4') as temp:
+                from matplotlib.animation import FuncAnimation
+                fps = 20
+                frames = actual_data.shape[0] // skip_steps
+                anim = FuncAnimation(fig, update, frames=frames, blit=False)
+                filename = temp.name
+                anim.save(filename, fps=fps,
+                          extra_args=['-vcodec', 'libx264', '-preset', 'fast', '-crf', '22'])
+
+                for i, logger in enumerate(loggers):
+                    logger.log_video(f"{video_tag}", filename, fps=fps)
+
+    except KeyboardInterrupt:
+        pass
