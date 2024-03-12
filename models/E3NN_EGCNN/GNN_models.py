@@ -9,7 +9,7 @@ from e3nn.nn.models.v2106.points_convolution import Convolution as Convolutionv2
 from e3nn.nn.models.v2106.gate_points_message_passing import tp_path_exists, Compose
 from torch_scatter import scatter
 
-import GNN_utils
+from . import GNN_utils
 import torch
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet

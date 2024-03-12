@@ -1,17 +1,12 @@
-numpy
-matplotlib
-#torch==2.1.0
-#torchvision
-#torchaudio
-tensorboard
-scipy
-PyQt5
-seaborn
-wandb
-moviepy
-imageio
-#torch-scatter -f https://data.pyg.org/whl/torch-2.1.1+cpu.html
-#torch-cluster
-#torch_geometric
-#pip install torch-geometric -f https://data.pyg.org/whl/torch-2.1.0+cpu.html
-#e3nn
+numpy==1.26.4
+matplotlib==3.8.3
+torch==2.2.0
+tensorboard==2.16.2
+scipy==1.12.0
+PyQt5==5.15.10
+seaborn==0.13.2
+wandb==0.16.3
+moviepy==1.0.3
+imageio==2.34.0
+e3nn==0.5.1
+jupyter==1.0.0

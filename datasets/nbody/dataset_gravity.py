@@ -56,6 +56,7 @@ class GravityDataset():
         loc = loc[0:self.max_samples, :, :, :]  # limit number of samples
         vel = vel[0:self.max_samples, :, :, :]  # speed when starting the trajectory
         force = force[0:self.max_samples, :, :, :]
+        mass = mass[0:self.max_samples]
 
         return loc, vel, force, torch.Tensor(mass)
 
