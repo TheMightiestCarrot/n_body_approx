@@ -117,7 +117,7 @@ class SpringSim(object):
             # run leapfrog
             for i in range(1, T):
                 loc_next += self._delta_T * vel_next
-                #loc_next, vel_next = self._clamp(loc_next, vel_next)
+                # loc_next, vel_next = self._clamp(loc_next, vel_next)
 
                 if i % sample_freq == 0:
                     loc[counter, :, :], vel[counter, :, :] = loc_next, vel_next
@@ -147,11 +147,12 @@ class SpringSim(object):
 
 
 class ChargedParticlesSim(object):
-    def __init__(self, n_balls=5, box_size=5., loc_std=1., vel_norm=0.5, interaction_strength=1., noise_var=0., dim=3, delta_t=0.001):
+    def __init__(self, n_balls=5, box_size=5., loc_std=1., vel_norm=0.5, interaction_strength=1., noise_var=0., dim=3,
+                 delta_t=0.001):
         self.n_balls = n_balls
         self.box_size = box_size
         self.loc_std = loc_std
-        self.loc_std = loc_std * (float(n_balls)/5.) ** (1/3)
+        self.loc_std = loc_std * (float(n_balls) / 5.) ** (1 / 3)
         print(self.loc_std)
         self.vel_norm = vel_norm
         self.interaction_strength = interaction_strength
@@ -264,7 +265,7 @@ class ChargedParticlesSim(object):
             # run leapfrog
             for i in range(1, T):
                 loc_next += self._delta_T * vel_next
-                #loc_next, vel_next = self._clamp(loc_next, vel_next)
+                # loc_next, vel_next = self._clamp(loc_next, vel_next)
 
                 if i % sample_freq == 0:
                     loc[counter, :, :], vel[counter, :, :] = loc_next, vel_next
@@ -296,7 +297,8 @@ class ChargedParticlesSim(object):
 
 
 class GravitySim(object):
-    def __init__(self, n_balls=100, loc_std=1, vel_norm=0.5, interaction_strength=1, noise_var=0, dt=0.001, softening=0.1, dim=3):
+    def __init__(self, n_balls=100, loc_std=1, vel_norm=0.5, interaction_strength=1, noise_var=0, dt=0.001,
+                 softening=0.1, dim=3):
         self.n_balls = n_balls
         self.loc_std = loc_std
         self.vel_norm = vel_norm
@@ -319,8 +321,8 @@ class GravitySim(object):
         dz = z.T - z
 
         # matrix that stores 1/r^3 for all particle pairwise particle separations
-        inv_r3 = (dx**2 + dy**2 + dz**2 + softening**2)
-        inv_r3[inv_r3 > 0] = inv_r3[inv_r3 > 0]**(-1.5)
+        inv_r3 = (dx ** 2 + dy ** 2 + dz ** 2 + softening ** 2)
+        inv_r3[inv_r3 > 0] = inv_r3[inv_r3 > 0] ** (-1.5)
 
         ax = G * (dx * inv_r3) @ mass
         ay = G * (dy * inv_r3) @ mass
@@ -332,7 +334,7 @@ class GravitySim(object):
 
     def _energy(self, pos, vel, mass, G):
         # Kinetic Energy:
-        KE = 0.5 * np.sum(np.sum(mass * vel**2))
+        KE = 0.5 * np.sum(np.sum(mass * vel ** 2))
 
         # Potential Energy:
 
@@ -347,18 +349,64 @@ class GravitySim(object):
         dz = z.T - z
 
         # matrix that stores 1/r for all particle pairwise particle separations
-        inv_r = np.sqrt(dx**2 + dy**2 + dz**2)
-        inv_r[inv_r > 0] = 1.0/inv_r[inv_r > 0]
+        inv_r = np.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
+        inv_r += self.softening ** 2
+        inv_r[inv_r > 0] = 1.0 / inv_r[inv_r > 0]
 
         # sum over upper triangle, to count each interaction only once
-        PE = G * np.sum(np.sum(np.triu(-(mass*mass.T)*inv_r, 1)))
+        PE = G * np.sum(np.sum(np.triu(-(mass * mass.T) * inv_r, 1)))
 
-        return KE, PE, KE+PE
+        return KE, PE, KE + PE
+
+    def plot_energies(self, loc, vel, mass):
+        # energies = [sim._energy(loc[i, :, :], vel[i, :, :], mass, sim.interaction_strength) for i in
+        #             #             range(loc.shape[0])]
+        # KE, PE, TOTAL =
+        energies = [self._energy(loc[i, :, :], vel[i, :, :], mass, self.interaction_strength) for i in
+                    range(loc.shape[0])]
+
+        energies_array = np.array(energies)
+
+        times = np.arange(energies_array.shape[0])
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(times, energies_array[:, 0], label='Kinetic Energy', color='red')
+        plt.plot(times, energies_array[:, 1], label='Potential Energy', color='blue')
+        plt.plot(times, energies_array[:, 2], label='Total Energy', color='black')
+        plt.xlabel('Time')
+        plt.ylabel('Energy')
+        plt.title('Energy vs Time (Filtered)')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+    def plot_trajectory_static(self, loc):
+        if self.dim == 2:
+            plt.figure(figsize=(10, 8))
+            for n in range(self.n_balls):
+                plt.plot(loc[:, n, 0], loc[:, n, 1], label=f'Particle {n + 1}')
+            plt.xlabel('X Position')
+            plt.ylabel('Y Position')
+        elif self.dim == 3:
+            fig = plt.figure(figsize=(10, 8))
+            ax = fig.add_subplot(111, projection='3d')
+            for n in range(self.n_balls):
+                ax.plot(loc[:, n, 0], loc[:, n, 1], loc[:, n, 2], label=f'Particle {n + 1}')
+            ax.set_xlabel('X Position')
+            ax.set_ylabel('Y Position')
+            ax.set_zlabel('Z Position')
+        else:
+            raise ValueError("Dimensions not supported for plotting")
+
+        plt.title('Particle Trajectories')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
 
     def sample_trajectory(self, T=10000, sample_freq=10):
         assert (T % sample_freq == 0)
 
-        T_save = int(T/sample_freq)
+        T_save = int(T / sample_freq)
 
         N = self.n_balls
 
@@ -369,7 +417,7 @@ class GravitySim(object):
         # Specific sim parameters
         mass = np.ones((N, 1))
         t = 0
-        pos = np.random.randn(N, self.dim)   # randomly selected positions and velocities
+        pos = np.random.randn(N, self.dim)  # randomly selected positions and velocities
         vel = np.random.randn(N, self.dim)
 
         # Convert to Center-of-Mass frame
@@ -380,12 +428,12 @@ class GravitySim(object):
 
         for i in range(T):
             if i % sample_freq == 0:
-                pos_save[int(i/sample_freq)] = pos
-                vel_save[int(i/sample_freq)] = vel
-                force_save[int(i/sample_freq)] = acc*mass
+                pos_save[int(i / sample_freq)] = pos
+                vel_save[int(i / sample_freq)] = vel
+                force_save[int(i / sample_freq)] = acc * mass
 
             # (1/2) kick
-            vel += acc * self.dt/2.0
+            vel += acc * self.dt / 2.0
 
             # drift
             pos += vel * self.dt
@@ -394,7 +442,7 @@ class GravitySim(object):
             acc = self.compute_acceleration(pos, mass, self.interaction_strength, self.softening)
 
             # (1/2) kick
-            vel += acc * self.dt/2.0
+            vel += acc * self.dt / 2.0
 
             # update time
             t += self.dt
@@ -407,9 +455,7 @@ class GravitySim(object):
 
 
 if __name__ == '__main__':
-    from tqdm import tqdm
-    color_map = "summer"
-    cmap = plt.get_cmap(color_map)
+    import matplotlib.pyplot as plt
 
     np.random.seed(43)
 
@@ -419,28 +465,9 @@ if __name__ == '__main__':
     loc, vel, force, mass = sim.sample_trajectory(T=5000, sample_freq=1)
 
     print("Simulation time: {}".format(time.time() - t))
-    plt.figure()
-    axes = plt.gca()
-    axes.set_xlim([-4., 4.])
-    axes.set_ylim([-4., 4.])
-    # for i in range(loc.shape[-2]):
-    #     plt.plot(loc[:, i, 0], loc[:, i, 1], alpha=0.1, linewidth=1)
-    #     plt.plot(loc[0, i, 0], loc[0, i, 1], 'o')
 
     offset = 4000
     N_frames = loc.shape[0] - offset
     N_particles = loc.shape[-2]
 
-    for i in tqdm(range(N_particles)):
-        color = cmap(i/N_particles)
-        # for j in range(loc.shape[0]-2):
-        for j in range(offset, offset + N_frames):
-            plt.plot(loc[j:j+2, i, 0], loc[j:j+2, i, 1], alpha=0.2 + 0.7 *
-                     ((j-offset)/N_frames)**4, linewidth=1, color=color)
-        plt.plot(loc[-1, i, 0], loc[-1, i, 1], 'o', markersize=3, color=color)
-    plt.axis("off")
-    # plt.figure()
-    # energies = [sim._energy(loc[i, :, :], vel[i, :, :], mass, sim.interaction_strength) for i in
-    #             range(loc.shape[0])]
-    # plt.plot(energies)
-    plt.show()
+    sim.plot_energies(loc, vel, mass)

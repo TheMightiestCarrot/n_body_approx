@@ -560,7 +560,7 @@ def simulate_gravitational_system(seed_value, N, tEnd, dt, softening, G, boxSize
 
         return a
 
-    def getEnergy(pos, vel, mass, G):
+    def getEnergy(pos, vel, mass, G, softening):
         # Kinetic Energy:
         KE = 0.5 * np.sum(np.sum(mass * vel ** 2))
 
@@ -571,6 +571,7 @@ def simulate_gravitational_system(seed_value, N, tEnd, dt, softening, G, boxSize
             dim_diff = pos[:, dim:dim + 1].T - pos[:, dim:dim + 1]
             inv_r += dim_diff ** 2
 
+        inv_r += softening ** 2
         inv_r = np.sqrt(inv_r)
         inv_r[inv_r > 0] = 1.0 / inv_r[inv_r > 0]
 
@@ -598,7 +599,7 @@ def simulate_gravitational_system(seed_value, N, tEnd, dt, softening, G, boxSize
 
     # calculate initial gravitational accelerations
     acc = getAcc(pos, mass, G, softening)
-    KE, PE = getEnergy(pos, vel, mass, G)
+    KE, PE = getEnergy(pos, vel, mass, G, softening)
 
     # number of timesteps
     Nt = int(np.ceil(tEnd / dt))
@@ -617,14 +618,15 @@ def simulate_gravitational_system(seed_value, N, tEnd, dt, softening, G, boxSize
         vel += acc * dt / 2.0
         pos += vel * dt
 
-        for n in range(N):
-            for j in range(dims):
-                if pos[n, j] > boxSize:
-                    pos[n, j] = boxSize - (pos[n, j] - boxSize)  # Reflect position inside boundary
-                    vel[n, j] *= -1  # Reverse velocity component
-                elif pos[n, j] < -boxSize:
-                    pos[n, j] = -boxSize + (-boxSize - pos[n, j])  # Reflect position inside boundary
-                    vel[n, j] *= -1  # Reverse velocity component
+        if boxSize is not None:
+            for n in range(N):
+                for j in range(dims):
+                    if pos[n, j] > boxSize:
+                        pos[n, j] = boxSize - (pos[n, j] - boxSize)  # Reflect position inside boundary
+                        vel[n, j] *= -1  # Reverse velocity component
+                    elif pos[n, j] < -boxSize:
+                        pos[n, j] = -boxSize + (-boxSize - pos[n, j])  # Reflect position inside boundary
+                        vel[n, j] *= -1  # Reverse velocity component
 
         acc = getAcc(pos, mass, G, softening)
         vel += acc * dt / 2.0
@@ -632,19 +634,17 @@ def simulate_gravitational_system(seed_value, N, tEnd, dt, softening, G, boxSize
         pos_save[:, :, i + 1] = pos
         vel_save[:, :, i + 1] = vel
         # get energy of system
-        KE, PE = getEnergy(pos, vel, mass, G)
+        KE, PE = getEnergy(pos, vel, mass, G, softening)
         KE_save[i + 1] = KE
         PE_save[i + 1] = PE
 
     combined_data = np.concatenate((pos_save, vel_save), axis=1)  # Shape: (100, 6, 1001)
     combined_data = combined_data.transpose(2, 0, 1)
 
-    filter_condition = ((KE_save + PE_save) > -200)
-    combined_data = combined_data[filter_condition, :, :]
-    filtered_KE = KE_save[filter_condition]
-    filtered_PE = PE_save[filter_condition]
+    filtered_KE = KE_save
+    filtered_PE = PE_save
     filtered_total_energy = filtered_KE + filtered_PE
-    filtered_time = t_all[filter_condition]
+    filtered_time = t_all
 
     plt.figure(figsize=(10, 6))
     plt.plot(filtered_time, filtered_KE, label='Kinetic Energy', color='red')
@@ -678,8 +678,8 @@ def simulate_gravitational_system(seed_value, N, tEnd, dt, softening, G, boxSize
     plt.legend()
     plt.grid(True)
     plt.show()
-
     return combined_data
+
 
 
 def log_hparams(writer, hparams, loss):
@@ -962,7 +962,7 @@ def interactive_trajectory_plot_all_particles(actual_data, predicted_data, parti
 
 def interactive_trajectory_plot_all_particles_3d(actual_data, predicted_data, particle_index=None, boxSize=1, dims=3,
                                                  offline_plot=False, loggers=[],
-                                                 video_tag="trajectories all particles 3D"):
+                                                 video_tag="trajectories all particles 3D", trace_length=10):
     import matplotlib
     from matplotlib.widgets import Slider
     import traceback
@@ -977,7 +977,6 @@ def interactive_trajectory_plot_all_particles_3d(actual_data, predicted_data, pa
                 matplotlib.use('TkAgg')
 
         skip_steps = 2
-        trace_length = 1
         plt.ion()
         fig = plt.figure(figsize=(12, 8))
 
@@ -1046,102 +1045,6 @@ def interactive_trajectory_plot_all_particles_3d(actual_data, predicted_data, pa
                     new_val = min(actual_data.shape[0] - 1, slider.val + 1)
                     slider.set_val(new_val)
 
-            update(0)
-            slider.on_changed(update)
-            plt.show(block=True)
-
-        if offline_plot:
-            import tempfile
-            with tempfile.NamedTemporaryFile(delete=True, suffix='.mp4') as temp:
-                from matplotlib.animation import FuncAnimation
-                fps = 20
-                frames = actual_data.shape[0] // skip_steps
-                anim = FuncAnimation(fig, update, frames=frames, blit=False)
-                filename = temp.name
-                anim.save(filename, fps=fps,
-                          extra_args=['-vcodec', 'libx264', '-preset', 'fast', '-crf', '22'])
-
-                for i, logger in enumerate(loggers):
-                    logger.log_video(f"{video_tag}", filename, fps=fps)
-
-    except KeyboardInterrupt:
-        pass
-
-
-def interactive_trajectory_plot_all_particles_3d_tracelesss(actual_data, predicted_data, particle_index=None, boxSize=1, dims=3,
-                                                 offline_plot=False, loggers=[],
-                                                 video_tag="trajectories all particles 3D"):
-    import matplotlib
-    from matplotlib.widgets import Slider
-    import traceback
-    og_backend = matplotlib.get_backend()
-    try:
-        if offline_plot:
-            matplotlib.use('Agg')
-        else:
-            try:
-                matplotlib.use('Qt5Agg')
-            except (NameError, KeyError):
-                matplotlib.use('TkAgg')
-
-        skip_steps = 2
-        plt.ion()
-        fig = plt.figure(figsize=(12, 8))
-
-        ax = fig.add_subplot(111, projection='3d')
-        ax.set_xlim(-boxSize, boxSize)
-        ax.set_ylim(-boxSize, boxSize)
-        ax.set_zlim(-boxSize, boxSize)
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-
-        ax.set_title('3D Trajectories of all particles ' + (
-            '' if particle_index is None else f'with predicted particle {str(particle_index)}'))
-
-        plt.subplots_adjust(bottom=0.25)
-        actual_lines = [ax.plot([], [], [], 'b-', label='Actual')[0] for _ in range(actual_data.shape[1])]
-        predicted_line, = ax.plot([], [], [], 'r-', label='Predicted')
-        from matplotlib.lines import Line2D
-        legend_lines = [Line2D([0], [0], color='blue', lw=2, label='Actual'),
-                        Line2D([0], [0], color='red', lw=2, label='Predicted')]
-        ax.legend(handles=legend_lines)
-
-        if not offline_plot:
-            ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03])
-            slider = Slider(ax_slider, 'Time Step', 0, actual_data.shape[0] - 1, valinit=0, valfmt='%0.0f')
-
-        def on_key(event):
-            if event.key == 'left':
-                new_val = max(0, slider.val - 1)
-                slider.set_val(new_val)
-            elif event.key == 'right':
-                new_val = min(actual_data.shape[0] - 1, slider.val + 1)
-                slider.set_val(new_val)
-
-        def update(val):
-            if offline_plot:
-                time_step = int(val) * skip_steps
-            else:
-                time_step = int(val)
-
-            for pi in range(actual_data.shape[1]):
-                # Only plot the current time_step's data
-                actual_lines[pi].set_data(actual_data[time_step, pi, 0], actual_data[time_step, pi, 1])
-                actual_lines[pi].set_3d_properties(actual_data[time_step, pi, 2])
-
-                if pi == particle_index:
-                    predicted_line.set_data(predicted_data[time_step, particle_index, 0],
-                                            predicted_data[time_step, particle_index, 1])
-                    predicted_line.set_3d_properties(predicted_data[time_step, particle_index, 2])
-
-            if offline_plot:
-                return actual_lines + [predicted_line]
-            else:
-                fig.canvas.draw_idle()
-
-        if not offline_plot:
-            fig.canvas.mpl_connect('key_press_event', on_key)
             update(0)
             slider.on_changed(update)
             plt.show(block=True)
