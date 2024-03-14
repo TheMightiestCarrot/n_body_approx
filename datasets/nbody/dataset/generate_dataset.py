@@ -43,6 +43,8 @@ parser.add_argument('--initial_vel', type=int, default=1,
 parser.add_argument('--suffix', type=str, default="",
                     help='add a suffix to the name')
 
+#todo G, dt
+
 args = parser.parse_args()
 
 initial_vel_norm = 0.5
@@ -111,17 +113,25 @@ if __name__ == "__main__":
                                                                     args.length_test,
                                                                     args.sample_freq)
 
+
+    if args.simulation == 'gravity':
+        edges = "forces"
+        nodes = "masses"
+    else:
+        edges = "edges"
+        nodes = "charges"
+
     np.save(os.path.join(save_path, 'loc_train' + suffix + '.npy'), loc_train)
     np.save(os.path.join(save_path, 'vel_train' + suffix + '.npy'), vel_train)
-    np.save(os.path.join(save_path, 'edges_train' + suffix + '.npy'), edges_train)
-    np.save(os.path.join(save_path, 'charges_train' + suffix + '.npy'), charges_train)
+    np.save(os.path.join(save_path, f'{edges}_train' + suffix + '.npy'), edges_train)
+    np.save(os.path.join(save_path, f'{nodes}_train' + suffix + '.npy'), charges_train)
 
     np.save(os.path.join(save_path, 'loc_valid' + suffix + '.npy'), loc_valid)
     np.save(os.path.join(save_path, 'vel_valid' + suffix + '.npy'), vel_valid)
-    np.save(os.path.join(save_path, 'edges_valid' + suffix + '.npy'), edges_valid)
-    np.save(os.path.join(save_path, 'charges_valid' + suffix + '.npy'), charges_valid)
+    np.save(os.path.join(save_path, f'{edges}_valid' + suffix + '.npy'), edges_valid)
+    np.save(os.path.join(save_path, f'{nodes}_valid' + suffix + '.npy'), charges_valid)
 
     np.save(os.path.join(save_path, 'loc_test' + suffix + '.npy'), loc_test)
     np.save(os.path.join(save_path, 'vel_test' + suffix + '.npy'), vel_test)
-    np.save(os.path.join(save_path, 'edges_test' + suffix + '.npy'), edges_test)
-    np.save(os.path.join(save_path, 'charges_test' + suffix + '.npy'), charges_test)
+    np.save(os.path.join(save_path, f'{edges}_test' + suffix + '.npy'), edges_test)
+    np.save(os.path.join(save_path, f'{nodes}_test' + suffix + '.npy'), charges_test)

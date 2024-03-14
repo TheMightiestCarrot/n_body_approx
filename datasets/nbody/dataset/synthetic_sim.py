@@ -403,7 +403,173 @@ class GravitySim(object):
         plt.grid(True)
         plt.show()
 
-    def sample_trajectory(self, T=10000, sample_freq=10):
+    @staticmethod
+    def plot_histograms(loc, vel):
+        num_dims = loc.shape[2]
+        dim_labels = ['x', 'y', 'z'][:num_dims]  # Labels for dimensions
+        colors = ['red', 'green', 'blue'][:num_dims]  # Color for each dimension
+
+        plt.figure(figsize=(10, 5))
+
+        # Positions
+        plt.subplot(1, 2, 1)
+        for i, (color, label) in enumerate(zip(colors, dim_labels)):
+            plt.hist(loc[:, :, i].flatten(), bins=20, alpha=0.5, color=color, label=f'{label}')
+        plt.title('Positions')
+        plt.legend()
+
+        # Velocities
+        plt.subplot(1, 2, 2)
+        for i, (color, label) in enumerate(zip(colors, dim_labels)):
+            plt.hist(vel[:, :, i].flatten(), bins=20, alpha=0.5, color=color, label=f'{label}')
+        plt.title('Velocities')
+        plt.legend()
+
+        plt.tight_layout()
+        plt.show()
+
+    @staticmethod
+    def interactive_trajectory_plot_all_particles_3d(actual_pos, predicted_pos=None, particle_index=None, boxSize=1,
+                                                     dims=3,
+                                                     offline_plot=False, loggers=[],
+                                                     video_tag="trajectories all particles 3D", trace_length=10):
+        import matplotlib
+        from matplotlib.widgets import Slider
+        import traceback
+        og_backend = matplotlib.get_backend()
+        try:
+            if offline_plot:
+                matplotlib.use('Agg')
+            else:
+                try:
+                    matplotlib.use('Qt5Agg')
+                except (NameError, KeyError):
+                    matplotlib.use('TkAgg')
+
+            skip_steps = 2
+            plt.ion()
+            fig = plt.figure(figsize=(12, 8))
+
+            ax = fig.add_subplot(111, projection='3d')
+            ax.set_xlim(-boxSize, boxSize)
+            ax.set_ylim(-boxSize, boxSize)
+            ax.set_zlim(-boxSize, boxSize)
+            ax.set_xlabel('X')
+            ax.set_ylabel('Y')
+            ax.set_zlabel('Z')
+
+            ax.set_title('3D Trajectories of all particles ' + (
+                '' if particle_index is None else f'with predicted particle {str(particle_index)}'))
+
+            plt.subplots_adjust(bottom=0.25)
+            actual_lines = [ax.plot([], [], [], 'b-', label='Actual')[0] for _ in range(actual_pos.shape[1])]
+
+            if predicted_pos is not None:
+                if particle_index is None:
+                    num_predicted_particles = predicted_pos.shape[1]
+                    predicted_lines = [ax.plot([0], [0], [0], 'r-')[0] for _ in range(num_predicted_particles)]
+                else:
+                    predicted_line, = ax.plot([], [], [], 'r-', label='Predicted')
+
+            from matplotlib.lines import Line2D
+            legend_lines = [Line2D([0], [0], color='blue', lw=2, label='Actual')]
+            if predicted_pos is not None:
+                legend_lines.append(Line2D([0], [0], color='red', lw=2, label='Predicted'))
+
+            ax.legend(handles=legend_lines)
+
+            if not offline_plot:
+                ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03])
+                slider = Slider(ax_slider, 'Time Step', 0, actual_pos.shape[0] - 1, valinit=0, valfmt='%0.0f')
+
+            def on_key(event):
+                if event.key == 'left':
+                    new_val = max(0, slider.val - 1)
+                    slider.set_val(new_val)
+                elif event.key == 'right':
+                    new_val = min(actual_pos.shape[0] - 1, slider.val + 1)
+                    slider.set_val(new_val)
+
+            def update(val):
+                if offline_plot:
+                    time_step = int(val) * skip_steps
+                else:
+                    time_step = int(val)
+
+                start_step = max(0, time_step - trace_length)
+
+                for pi in range(actual_pos.shape[1]):
+                    actual_lines[pi].set_data(actual_pos[start_step:time_step + 1, pi, 0],
+                                              actual_pos[start_step:time_step + 1, pi, 1])
+                    actual_lines[pi].set_3d_properties(actual_pos[start_step:time_step + 1, pi, 2])
+
+                # Update predicted particle(s)
+                if predicted_pos is not None:
+                    if particle_index is not None:
+                        # Plot specific predicted particle
+                        predicted_line.set_data(predicted_pos[start_step:time_step + 1, particle_index, 0],
+                                                predicted_pos[start_step:time_step + 1, particle_index, 1])
+                        predicted_line.set_3d_properties(predicted_pos[start_step:time_step + 1, particle_index, 2])
+                    else:
+                        # Plot all predicted particles
+                        for pi in range(predicted_pos.shape[1]):
+                            predicted_lines[pi].set_data(predicted_pos[start_step:time_step + 1, pi, 0],
+                                                         predicted_pos[start_step:time_step + 1, pi, 1])
+                            predicted_lines[pi].set_3d_properties(predicted_pos[start_step:time_step + 1, pi, 2])
+
+                if offline_plot:
+                    return actual_lines + [predicted_line]
+                else:
+                    fig.canvas.draw_idle()
+
+            if not offline_plot:
+                fig.canvas.mpl_connect('key_press_event', on_key)
+
+                def on_key(event):
+                    if event.key == 'left':
+                        new_val = max(0, slider.val - 1)
+                        slider.set_val(new_val)
+                    elif event.key == 'right':
+                        new_val = min(actual_pos.shape[0] - 1, slider.val + 1)
+                        slider.set_val(new_val)
+
+                update(0)
+                slider.on_changed(update)
+                plt.show(block=True)
+
+            if offline_plot:
+                import tempfile
+                with tempfile.NamedTemporaryFile(delete=True, suffix='.mp4') as temp:
+                    from matplotlib.animation import FuncAnimation
+                    fps = 20
+                    frames = actual_pos.shape[0] // skip_steps
+                    anim = FuncAnimation(fig, update, frames=frames, blit=False)
+                    filename = temp.name
+                    anim.save(filename, fps=fps,
+                              extra_args=['-vcodec', 'libx264', '-preset', 'fast', '-crf', '22'])
+
+                    for i, logger in enumerate(loggers):
+                        logger.log_video(f"{video_tag}", filename, fps=fps)
+
+        except KeyboardInterrupt:
+            pass
+
+    def simulate_step(self, pos, vel, acc, mass):
+        # (1/2) kick
+        vel += acc * self.dt / 2.0
+
+        # drift
+        pos += vel * self.dt
+
+        # update accelerations
+        acc = self.compute_acceleration(pos, mass, self.interaction_strength, self.softening)
+
+        # (1/2) kick
+        vel += acc * self.dt / 2.0
+
+        return pos, vel, acc
+
+    def sample_trajectory(self, T=10000, sample_freq=10, og_pos_save=None, og_vel_save=None, og_force_save=None):
         assert (T % sample_freq == 0)
 
         T_save = int(T / sample_freq)
@@ -414,43 +580,46 @@ class GravitySim(object):
         vel_save = np.zeros((T_save, N, self.dim))
         force_save = np.zeros((T_save, N, self.dim))
 
-        # Specific sim parameters
         mass = np.ones((N, 1))
-        t = 0
-        pos = np.random.randn(N, self.dim)  # randomly selected positions and velocities
-        vel = np.random.randn(N, self.dim)
+        if og_pos_save is None:
+            # Specific sim parameters
+            pos = np.random.randn(N, self.dim)  # randomly selected positions and velocities
+            vel = np.random.randn(N, self.dim)
 
-        # Convert to Center-of-Mass frame
-        vel -= np.mean(mass * vel, 0) / np.mean(mass)
+            # Convert to Center-of-Mass frame
+            vel -= np.mean(mass * vel, 0) / np.mean(mass)
+
+        else:
+            pos = np.copy(og_pos_save[-1])
+            vel = np.copy(og_vel_save[-1])
 
         # calculate initial gravitational accelerations
         acc = self.compute_acceleration(pos, mass, self.interaction_strength, self.softening)
 
+        if og_pos_save is not None:
+            pos, vel, acc = self.simulate_step(pos, vel, acc, mass)
+
+        counter = 0
+
         for i in range(T):
             if i % sample_freq == 0:
-                pos_save[int(i / sample_freq)] = pos
-                vel_save[int(i / sample_freq)] = vel
-                force_save[int(i / sample_freq)] = acc * mass
+                pos_save[counter] = pos
+                vel_save[counter] = vel
+                force_save[counter] = acc * mass
+                counter += 1
 
-            # (1/2) kick
-            vel += acc * self.dt / 2.0
-
-            # drift
-            pos += vel * self.dt
-
-            # update accelerations
-            acc = self.compute_acceleration(pos, mass, self.interaction_strength, self.softening)
-
-            # (1/2) kick
-            vel += acc * self.dt / 2.0
-
-            # update time
-            t += self.dt
+            pos, vel, acc = self.simulate_step(pos, vel, acc, mass)
 
         # Add noise to observations
         pos_save += np.random.randn(T_save, N, self.dim) * self.noise_var
         vel_save += np.random.randn(T_save, N, self.dim) * self.noise_var
         force_save += np.random.randn(T_save, N, self.dim) * self.noise_var
+
+        if og_pos_save is not None:
+            pos_save = np.concatenate((og_pos_save, pos_save), axis=0)
+            vel_save = np.concatenate((og_vel_save, vel_save), axis=0)
+            force_save = np.concatenate((og_force_save, force_save), axis=0)
+
         return pos_save, vel_save, force_save, mass
 
 

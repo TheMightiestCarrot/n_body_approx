@@ -36,12 +36,15 @@ class GravityDataset():
         self.neighbours = int(neighbours)
         self.target = target
 
-    def load(self):
+    def load(self, path=None):
 
-        loc = np.load(os.path.join(self.path, 'loc_' + self.suffix + '.npy'))
-        vel = np.load(os.path.join(self.path, 'vel_' + self.suffix + '.npy'))
-        force = np.load(os.path.join(self.path, 'edges_' + self.suffix + '.npy'))
-        mass = np.load(os.path.join(self.path, 'charges_' + self.suffix + '.npy'))
+        if path is None:
+            path = self.path
+
+        loc = np.load(os.path.join(path, 'loc_' + self.suffix + '.npy'))
+        vel = np.load(os.path.join(path, 'vel_' + self.suffix + '.npy'))
+        force = np.load(os.path.join(path, 'forces_' + self.suffix + '.npy'))
+        mass = np.load(os.path.join(path, 'masses_' + self.suffix + '.npy'))
 
         self.num_nodes = loc.shape[-1]
 
@@ -101,6 +104,16 @@ class GravityDataset():
     #             cols.append(edges[1] + n_nodes * i)
     #         edges = [torch.cat(rows), torch.cat(cols)]
     #     return edges
+
+    def get_one_sim_data(self, simulation_index):
+        loc, vel, force, mass = self.data
+        loc = loc[simulation_index]
+        vel = vel[simulation_index]
+        force = force[simulation_index]
+        mass = mass[simulation_index]
+
+        return loc, vel, force, mass
+    
 
 
 if __name__ == "__main__":
