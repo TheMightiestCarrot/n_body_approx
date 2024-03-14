@@ -359,9 +359,6 @@ class GravitySim(object):
         return KE, PE, KE + PE
 
     def plot_energies(self, loc, vel, mass):
-        # energies = [sim._energy(loc[i, :, :], vel[i, :, :], mass, sim.interaction_strength) for i in
-        #             #             range(loc.shape[0])]
-        # KE, PE, TOTAL =
         energies = [self._energy(loc[i, :, :], vel[i, :, :], mass, self.interaction_strength) for i in
                     range(loc.shape[0])]
 
@@ -380,17 +377,20 @@ class GravitySim(object):
         plt.grid(True)
         plt.show()
 
-    def plot_trajectory_static(self, loc):
-        if self.dim == 2:
+    @staticmethod
+    def plot_trajectory_static(loc):
+        num_dims = loc.shape[2]
+        n_balls = loc.shape[1]
+        if num_dims == 2:
             plt.figure(figsize=(10, 8))
-            for n in range(self.n_balls):
+            for n in range(n_balls):
                 plt.plot(loc[:, n, 0], loc[:, n, 1], label=f'Particle {n + 1}')
             plt.xlabel('X Position')
             plt.ylabel('Y Position')
-        elif self.dim == 3:
+        elif num_dims == 3:
             fig = plt.figure(figsize=(10, 8))
             ax = fig.add_subplot(111, projection='3d')
-            for n in range(self.n_balls):
+            for n in range(n_balls):
                 ax.plot(loc[:, n, 0], loc[:, n, 1], loc[:, n, 2], label=f'Particle {n + 1}')
             ax.set_xlabel('X Position')
             ax.set_ylabel('Y Position')
