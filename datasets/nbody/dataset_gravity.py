@@ -1,8 +1,11 @@
 import os
 import pathlib
-
+import json
 import numpy as np
 import torch
+from .dataset.synthetic_sim import GravitySim
+import matplotlib.pyplot as plt
+from multiprocessing import Pool
 
 
 class GravityDataset():
@@ -30,6 +33,8 @@ class GravityDataset():
 
         assert target in ["pos", "force"]
 
+        self.metadata = {}
+        self.simulation = None
         self.max_samples = int(max_samples)
         self.dataset_name = dataset_name
         self.data, self.edges = self.load()
@@ -48,20 +53,22 @@ class GravityDataset():
 
         self.num_nodes = loc.shape[-1]
 
+        metadata_path = os.path.join(path, 'metadata.json')
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as json_file:
+                self.metadata = json.load(json_file)
+                self.simulation = self.init_simulation_instance()
+
         loc, vel, force, mass = self.preprocess(loc, vel, force, mass)
         return (loc, vel, force, mass), None
 
     def preprocess(self, loc, vel, force, mass):
-        # cast to torch and swap n_nodes <--> n_features dimensions
-        # loc = torch.Tensor(loc).transpose(2, 3)
-        # vel = torch.Tensor(vel).transpose(2, 3)
-        # force = torch.Tensor(force).transpose(2, 3)
         loc = loc[0:self.max_samples, :, :, :]  # limit number of samples
         vel = vel[0:self.max_samples, :, :, :]  # speed when starting the trajectory
         force = force[0:self.max_samples, :, :, :]
         mass = mass[0:self.max_samples]
 
-        return loc, vel, force, torch.Tensor(mass)
+        return loc, vel, force, mass
 
     def set_max_samples(self, max_samples):
         self.max_samples = int(max_samples)
@@ -93,17 +100,10 @@ class GravityDataset():
     def __len__(self):
         return self.data[0].shape[0]
 
-    # def get_edges(self, batch_size, n_nodes):
-    #     edges = [torch.LongTensor(self.edges[0]), torch.LongTensor(self.edges[1])]
-    #     if batch_size == 1:
-    #         return edges
-    #     elif batch_size > 1:
-    #         rows, cols = [], []
-    #         for i in range(batch_size):
-    #             rows.append(edges[0] + n_nodes * i)
-    #             cols.append(edges[1] + n_nodes * i)
-    #         edges = [torch.cat(rows), torch.cat(cols)]
-    #     return edges
+    def init_simulation_instance(self):
+        args = self.metadata['args']
+        return GravitySim(noise_var=args['noise_var'], n_balls=args['n_balls'], vel_norm=args['initial_vel_norm'],
+                          interaction_strength=args['G'], dt=args['dt'])
 
     def get_one_sim_data(self, simulation_index):
         loc, vel, force, mass = self.data
@@ -113,7 +113,238 @@ class GravityDataset():
         mass = mass[simulation_index]
 
         return loc, vel, force, mass
-    
+
+    @staticmethod
+    def plot_histograms(loc, vel, bins=30):
+        num_dims = loc.shape[3]  # Update to reflect new indexing due to the additional 'bodies' dimension
+        dim_labels = ['x', 'y', 'z'][:num_dims]  # Labels for dimensions
+        colors = ['red', 'green', 'blue'][:num_dims]  # Color for each dimension
+
+        plt.figure(figsize=(10, 5))
+
+        # Positions
+        plt.subplot(1, 2, 1)
+        for i, (color, label) in enumerate(zip(colors, dim_labels)):
+            # Flatten across simulations, steps, and bodies but keep dimensions separate
+            plt.hist(loc[:, :, :, i].flatten(), bins=bins, alpha=0.5, color=color, label=f'{label} position')
+        plt.title('Positions')
+        plt.legend()
+
+        # Velocities
+        plt.subplot(1, 2, 2)
+        for i, (color, label) in enumerate(zip(colors, dim_labels)):
+            # Flatten across simulations, steps, and bodies but keep dimensions separate
+            plt.hist(vel[:, :, :, i].flatten(), bins=bins, alpha=0.5, color=color, label=f'{label} velocity')
+        plt.title('Velocities')
+        plt.legend()
+
+        plt.tight_layout()
+        plt.show()
+
+    def simulate_one(self, sim):
+        loc, vel, force, mass = self.data
+        energies = [self.simulation._energy(loc[sim, i, :, :], vel[sim, i, :, :], mass[i],
+                                            self.simulation.interaction_strength) for i in
+                    range(loc.shape[1])]
+        return energies
+
+    def plot_energy_statistics(self):
+        loc, vel, force, mass = self.data
+        num_simulations = loc.shape[0]
+
+        with Pool() as pool:
+            energies = pool.map(self.simulate_one, range(0, num_simulations))
+        energies_array = np.array(energies)
+
+        plt.figure(figsize=(14, 8))
+        colors = {'Kinetic Energy': 'red', 'Potential Energy': 'blue', 'Total Energy': 'green'}
+        energy_labels = ['Kinetic Energy', 'Potential Energy', 'Total Energy']
+
+        for i, energy_label in enumerate(energy_labels):
+            energy_mean = energies_array[:, :, i].mean(axis=0)
+            energy_std = energies_array[:, :, i].std(axis=0)
+
+            times = np.arange(energy_mean.shape[0])
+
+            # Plot mean
+            plt.plot(times, energy_mean, color=colors[energy_label], label=energy_label)
+            # Plot standard deviation range
+            plt.fill_between(times, energy_mean - energy_std, energy_mean + energy_std, color=colors[energy_label],
+                             alpha=0.2)
+
+        plt.xlabel('Time')
+        plt.ylabel('Energy')
+        plt.title('Average Energy vs Time for Multiple Simulations with Std. Dev.')
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+    # def plot_energy_distributions(self, time_point=None, bins=50):
+    #     loc, vel, force, mass = self.data
+    #
+    #     if time_point is None:
+    #         num_simulations = loc.shape[0]
+    #         with Pool() as pool:
+    #             energies = pool.map(self.simulate_one, range(0, num_simulations))
+    #     energies_array = np.array(energies)
+    #
+    #     if time_point is not None:
+    #         # If a specific time point is provided, use it
+    #         energy_slice = energies_array[:, time_point, :]
+    #     else:
+    #         # Otherwise, calculate the average energy across all time points
+    #         energy_slice = energies_array.mean(axis=1)
+    #
+    #     energy_types = ['Kinetic Energy', 'Potential Energy', 'Total Energy']
+    #     colors = ['red', 'blue', 'green']
+    #
+    #     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    #     fig.suptitle('Energy Distributions' + (' at Time Point {}'.format(time_point) if time_point is not None else ' - Averages'))
+    #
+    #     for i, ax in enumerate(axes):
+    #         ax.hist(energy_slice[:, i], bins=bins, color=colors[i], alpha=0.7, density=True)
+    #         ax.set_title(energy_types[i])
+    #         ax.set_xlabel('Energy')
+    #         ax.set_ylabel('Density')
+    #
+    #     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    #     plt.show()
+
+    def plot_energy_distributions_across_all_sims(self, bins=50):
+        loc, vel, force, mass = self.data
+        num_simulations = loc.shape[0]
+
+        with Pool() as pool:
+            energies = pool.map(self.simulate_one, range(0, num_simulations))
+        energies_array = np.array(energies)
+
+        # Flatten the energy arrays to include all time points from all simulations
+        kinetic_energies = energies_array[:, :, 0].flatten()
+        potential_energies = energies_array[:, :, 1].flatten()
+        total_energies = energies_array[:, :, 2].flatten()
+
+        energy_types = ['Kinetic Energy', 'Potential Energy', 'Total Energy']
+        energies = [kinetic_energies, potential_energies, total_energies]
+        colors = ['red', 'blue', 'green']
+
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+        fig.suptitle('Energy Distributions Across All Time Points and Simulations')
+
+        for i, ax in enumerate(axes):
+            ax.hist(energies[i], bins=bins, color=colors[i], alpha=0.7, density=True)
+            ax.set_title(energy_types[i])
+            ax.set_xlabel('Energy')
+            ax.set_ylabel('Density')
+
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.show()
+
+    def plot_energies_of_all_sims(self):
+        loc, vel, force, mass = self.data
+        num_simulations = loc.shape[0]
+
+        with Pool() as pool:
+            energies = pool.map(self.simulate_one, range(0, num_simulations))
+        energies_array = np.array(energies)
+
+        plt.figure(figsize=(14, 8))
+
+        colors = {'Kinetic Energy': 'red', 'Potential Energy': 'blue', 'Total Energy': 'green'}
+
+        for energy_type, color in colors.items():
+            plt.plot([], [], color=color, label=energy_type)
+
+        # Plotting all three energy types for each simulation
+        for sim in range(num_simulations):
+            times = np.arange(energies_array[sim].shape[0])
+
+            # Kinetic Energy
+            plt.plot(times, energies_array[sim, :, 0], alpha=0.3, color=colors['Kinetic Energy'], linestyle='--')
+
+            # Potential Energy
+            plt.plot(times, energies_array[sim, :, 1], alpha=0.3, color=colors['Potential Energy'], linestyle=':')
+
+            # Total Energy
+            plt.plot(times, energies_array[sim, :, 2], alpha=0.3, color=colors['Total Energy'])
+
+        plt.xlabel('Time')
+        plt.ylabel('Energy')
+        plt.title('Energy vs Time for Multiple Simulations')
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()  # Adjust layout to make sure everything fits without overlapping
+        plt.show()
+
+    @staticmethod
+    def plot_trajectories_static(loc, opacity=0.4, max_sims=100):
+        num_sims = loc.shape[0]
+        num_dims = loc.shape[3]
+        n_balls = loc.shape[2]
+
+        # If the number of simulations exceeds max_sims, sample max_sims randomly
+        if num_sims > max_sims:
+            selected_sims = np.random.choice(num_sims, max_sims, replace=False)
+        else:
+            selected_sims = np.arange(num_sims)
+
+        if num_dims == 2:
+            plt.figure(figsize=(10, 8))
+            for sim in selected_sims:
+                for n in range(n_balls):
+                    plt.plot(loc[sim, :, n, 0], loc[sim, :, n, 1], alpha=opacity, linewidth=0.5)
+
+        elif num_dims == 3:
+            fig = plt.figure(figsize=(10, 8))
+            ax = fig.add_subplot(111, projection='3d')
+            for sim in selected_sims:
+                for n in range(n_balls):
+                    ax.plot(loc[sim, :, n, 0], loc[sim, :, n, 1], loc[sim, :, n, 2], alpha=opacity, linewidth=0.5)
+        else:
+            raise ValueError("Dimensions not supported for plotting")
+
+        plt.grid(True)
+        plt.show()
+
+    @staticmethod
+    def plot_trajectories_static_3D_to_2D(loc, opacity=0.4, max_sims=100):
+
+        num_sims = loc.shape[0]
+        n_balls = loc.shape[2]
+
+        # If max_sims is specified and the number of simulations exceeds it, sample max_sims randomly
+        if max_sims is not None and num_sims > max_sims:
+            selected_sims = np.random.choice(num_sims, max_sims, replace=False)
+        else:
+            selected_sims = np.arange(num_sims)
+
+        fig, axs = plt.subplots(1, 3, figsize=(18, 6))
+
+        for sim in selected_sims:
+            for n in range(n_balls):
+                # XY plane
+                axs[0].plot(loc[sim, :, n, 0], loc[sim, :, n, 1], alpha=opacity)
+                axs[0].set_xlabel('X Position')
+                axs[0].set_ylabel('Y Position')
+                axs[0].set_title('XY Plane')
+
+                # XZ plane
+                axs[1].plot(loc[sim, :, n, 0], loc[sim, :, n, 2], alpha=opacity)
+                axs[1].set_xlabel('X Position')
+                axs[1].set_ylabel('Z Position')
+                axs[1].set_title('XZ Plane')
+
+                # YZ plane
+                axs[2].plot(loc[sim, :, n, 1], loc[sim, :, n, 2], alpha=opacity)
+                axs[2].set_xlabel('Y Position')
+                axs[2].set_ylabel('Z Position')
+                axs[2].set_title('YZ Plane')
+
+        for ax in axs:
+            ax.grid(True)
+
+        plt.tight_layout()
+        plt.show()
 
 
 if __name__ == "__main__":

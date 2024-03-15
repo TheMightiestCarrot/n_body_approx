@@ -349,8 +349,7 @@ class GravitySim(object):
         dz = z.T - z
 
         # matrix that stores 1/r for all particle pairwise particle separations
-        inv_r = np.sqrt(dx ** 2 + dy ** 2 + dz ** 2)
-        inv_r += self.softening ** 2
+        inv_r = np.sqrt(dx ** 2 + dy ** 2 + dz ** 2 + self.softening ** 2)
         inv_r[inv_r > 0] = 1.0 / inv_r[inv_r > 0]
 
         # sum over upper triangle, to count each interaction only once
@@ -424,6 +423,27 @@ class GravitySim(object):
             plt.hist(vel[:, :, i].flatten(), bins=20, alpha=0.5, color=color, label=f'{label}')
         plt.title('Velocities')
         plt.legend()
+
+        plt.tight_layout()
+        plt.show()
+
+    def plot_energy_distribution(self, loc, vel, mass, bins=50):
+        energies = [self._energy(loc[i, :, :], vel[i, :, :], mass, self.interaction_strength) for i in
+                    range(loc.shape[0])]
+        energies_array = np.array(energies)
+
+        plt.figure(figsize=(15, 5))
+
+        energy_types = ['Kinetic Energy', 'Potential Energy', 'Total Energy']
+        colors = ['red', 'blue', 'black']
+
+        for i in range(3):
+            plt.subplot(1, 3, i + 1)
+            plt.hist(energies_array[:, i], bins=bins, color=colors[i], alpha=0.7)
+            plt.xlabel('Energy')
+            plt.ylabel('Frequency')
+            plt.title(f'{energy_types[i]} Histogram')
+            plt.grid(True)
 
         plt.tight_layout()
         plt.show()

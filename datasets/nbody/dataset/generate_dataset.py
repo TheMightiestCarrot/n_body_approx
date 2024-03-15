@@ -15,7 +15,7 @@ gravity_small: python3 -u generate_dataset.py --simulation=gravity --num-train 1
 import sys
 
 sys.argv = [
-    'generate_dataset.py', '--simulation=charged', '--num-train=10000', '--seed=43',
+    'generate_dataset.py', '--simulation=gravity', '--num-train=10000', '--seed=43',
     '--suffix=small', '--num-valid=2000', '--num-test=2000'
 ]
 
@@ -42,8 +42,13 @@ parser.add_argument('--initial_vel', type=int, default=1,
                     help='consider initial velocity')
 parser.add_argument('--suffix', type=str, default="",
                     help='add a suffix to the name')
-
-#todo G, dt
+# GRAVITY PARAMS
+parser.add_argument('--G', type=int, default=1,
+                    help='gravitational constant')
+parser.add_argument('--dt', type=int, default=0.001,
+                    help='simulation step')
+parser.add_argument('--softening', type=int, default=0.1,
+                    help='softening parameter of gravity simulation')
 
 args = parser.parse_args()
 
@@ -51,15 +56,19 @@ initial_vel_norm = 0.5
 if not args.initial_vel:
     initial_vel_norm = 1e-16
 
+args.initial_vel_norm = initial_vel_norm
+args.noise_var = 0
+
 if args.simulation == 'springs':
-    sim = SpringSim(noise_var=0.0, n_balls=args.n_balls)
+    sim = SpringSim(noise_var=args.noise_var, n_balls=args.n_balls)
     suffix = '_springs'
 elif args.simulation == 'charged':
-    sim = ChargedParticlesSim(noise_var=0.0, n_balls=args.n_balls, vel_norm=initial_vel_norm)
+    sim = ChargedParticlesSim(noise_var=args.noise_var, n_balls=args.n_balls, vel_norm=args.initial_vel_norm)
     suffix = '_charged'
     save_path = NBodyDataset.path
 elif args.simulation == 'gravity':
-    sim = GravitySim(noise_var=0.0, n_balls=args.n_balls, vel_norm=initial_vel_norm)
+    sim = GravitySim(noise_var=args.noise_var, n_balls=args.n_balls, vel_norm=args.initial_vel_norm,
+                     interaction_strength=args.G, dt=args.dt)
     suffix = '_gravity'
     save_path = GravityDataset.path
 else:
@@ -96,8 +105,6 @@ def generate_dataset(num_sims, length, sample_freq):
 
 
 if __name__ == "__main__":
-
-    print(save_path)
     print("Generating {} training simulations".format(args.num_train))
     loc_train, vel_train, edges_train, charges_train = generate_dataset(args.num_train,
                                                                         args.length,
@@ -112,7 +119,6 @@ if __name__ == "__main__":
     loc_test, vel_test, edges_test, charges_test = generate_dataset(args.num_test,
                                                                     args.length_test,
                                                                     args.sample_freq)
-
 
     if args.simulation == 'gravity':
         edges = "forces"
@@ -135,3 +141,8 @@ if __name__ == "__main__":
     np.save(os.path.join(save_path, 'vel_test' + suffix + '.npy'), vel_test)
     np.save(os.path.join(save_path, f'{edges}_test' + suffix + '.npy'), edges_test)
     np.save(os.path.join(save_path, f'{nodes}_test' + suffix + '.npy'), charges_test)
+
+    import json
+
+    with open(os.path.join(save_path, 'metadata.json'), 'w') as f:
+        json.dump({"args": vars(args)}, f, indent=4)
