@@ -1,26 +1,14 @@
-import logging
-import time
 import math
 import numpy as np
 import torch
 import torch.nn as nn
-from pyexpat.model import XML_CQUANT_OPT
 
-from ocpmodels.common.registry import registry
-from ocpmodels.common.utils import conditional_grad
 from .base_model import BaseModel
-from ocpmodels.models.scn.sampling import CalcSpherePoints
-from ocpmodels.models.scn.smearing import (
+from .utils import (
     GaussianSmearing,
 )
 
-try:
-    from e3nn import o3
-except ImportError:
-    pass
-
 from .gaussian_rbf import GaussianRadialBasisLayer
-from torch.nn import Linear
 from .edge_rot_mat import init_edge_rot_mat
 from .so3 import (
     CoefficientMappingModule,
@@ -30,7 +18,6 @@ from .so3 import (
     SO3_LinearV2,
 )
 from .module_list import ModuleListInfo
-from .so2_ops import SO2_Convolution
 from .radial_function import RadialFunction
 from .layer_norm import (
     EquivariantLayerNormArray,
@@ -46,16 +33,11 @@ from .transformer_block import (
 )
 from .input_block import EdgeDegreeEmbedding
 
-from torch_geometric.data import Data
-from torch_geometric.nn import knn_graph
-
-
 # Statistics of IS2RE 100K
-_AVG_NUM_NODES = 77.81317
 _AVG_DEGREE = 23.395238876342773  # IS2RE: 100k, max_radius = 5, max_neighbors = 100
 
 
-@registry.register_model("equiformer_v2")
+# TODO: consider using conditional gradients: https://github.com/Open-Catalyst-Project/ocp/blob/9108a87ce383b2982c24eff4178632f01fecb63e/ocpmodels/common/utils.py#L129C1-L143C21
 class EquiformerV2_nbody(BaseModel):
     """
     Equiformer with graph attention built upon SO(2) convolution and feedforward network built upon S2 activation
@@ -352,7 +334,7 @@ class EquiformerV2_nbody(BaseModel):
         self.apply(self._init_weights)
         self.apply(self._uniform_init_rad_func_linear_weights)
 
-    @conditional_grad(torch.enable_grad())
+    # TODO: consider using conditional gradients: https://github.com/Open-Catalyst-Project/ocp/blob/9108a87ce383b2982c24eff4178632f01fecb63e/ocpmodels/common/utils.py#L129C1-L143C21
     def forward(self, data, batch_idx):
         loc_frame_0, vel_frame_0, edge_attr, charges = data
         # Extract relevant information from the input data
