@@ -13,6 +13,8 @@ from torch_geometric.nn import radius_graph
 
 from .utils import (
     compute_neighbors,
+    get_pbc_distances,
+    radius_graph_pbc,
 )
 
 
@@ -26,8 +28,6 @@ class BaseModel(nn.Module):
     def forward(self, data):
         raise NotImplementedError
 
-    # OCP also implements a PBC version. I removed it for simplicity for now.
-    # https://github.com/Open-Catalyst-Project/ocp/blob/9108a87ce383b2982c24eff4178632f01fecb63e/ocpmodels/models/base.py#L33
     def generate_graph(
         self,
         data,
@@ -35,13 +35,23 @@ class BaseModel(nn.Module):
         max_neighbors=None,
         use_pbc=None,
         otf_graph=None,
+        enforce_max_neighbors_strictly=None,
     ):
         cutoff = cutoff or self.cutoff
         max_neighbors = max_neighbors or self.max_neighbors
         use_pbc = use_pbc or self.use_pbc
         otf_graph = otf_graph or self.otf_graph
 
-        positions = data.pos if "pos" in data else data[0]
+        if enforce_max_neighbors_strictly is not None:
+            pass
+        elif hasattr(self, "enforce_max_neighbors_strictly"):
+            # Not all models will have this attribute
+            enforce_max_neighbors_strictly = (
+                self.enforce_max_neighbors_strictly
+            )
+        else:
+            # Default to old behavior
+            enforce_max_neighbors_strictly = True
 
         if not otf_graph:
             try:
@@ -57,25 +67,49 @@ class BaseModel(nn.Module):
                 )
                 otf_graph = True
 
-        if otf_graph:
-            edge_index = radius_graph(
-                positions,
-                r=cutoff,
-                batch=data.batch if "batch" in data else None,
-                max_num_neighbors=max_neighbors,
+        if use_pbc:
+            if otf_graph:
+                edge_index, cell_offsets, neighbors = radius_graph_pbc(
+                    data,
+                    cutoff,
+                    max_neighbors,
+                    enforce_max_neighbors_strictly,
+                )
+
+            out = get_pbc_distances(
+                data.pos,
+                edge_index,
+                data.cell,
+                cell_offsets,
+                neighbors,
+                return_offsets=True,
+                return_distance_vec=True,
             )
 
-        j, i = edge_index
-        distance_vec = positions[j] - positions[i]
+            edge_index = out["edge_index"]
+            edge_dist = out["distances"]
+            cell_offset_distances = out["offsets"]
+            distance_vec = out["distance_vec"]
+        else:
+            if otf_graph:
+                edge_index = radius_graph(
+                    data.pos,
+                    r=cutoff,
+                    batch=data.batch,
+                    max_num_neighbors=max_neighbors,
+                )
 
-        edge_dist = distance_vec.norm(dim=-1)
-        cell_offsets = torch.zeros(
-            edge_index.shape[1], 3, device=positions.device
-        )
-        cell_offset_distances = torch.zeros_like(
-            cell_offsets, device=positions.device
-        )
-        neighbors = compute_neighbors(data, edge_index)
+            j, i = edge_index
+            distance_vec = data.pos[j] - data.pos[i]
+
+            edge_dist = distance_vec.norm(dim=-1)
+            cell_offsets = torch.zeros(
+                edge_index.shape[1], 3, device=data.pos.device
+            )
+            cell_offset_distances = torch.zeros_like(
+                cell_offsets, device=data.pos.device
+            )
+            neighbors = compute_neighbors(data, edge_index)
 
         return (
             edge_index,
