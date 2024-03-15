@@ -1,4 +1,10 @@
 /config.ini
 run*/
 /wandb/
+
 .idea
+.vscode
+
+__pycache__
+
+*.npy
