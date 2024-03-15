@@ -1,0 +1,29 @@
+{
+    "version": "1.0.0",
+    "configurations": [
+        {
+            "name": "Python: Train nbody-approx",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/segnn_script.py",
+            "python": "${command:python.interpreterPath}",
+            "args": [
+                "main.py",
+                "--dataset=gravity",
+                "--epochs=5",
+                "--max_samples=3000",
+                "--model=segnn",
+                "--lmax_h=1",
+                "--lmax_attr=1",
+                "--layers=4",
+                "--hidden_features=64",
+                "--subspace_type=weightbalanced",
+                "--norm=none",
+                "--batch_size=100",
+                "--gpu=1",
+                "--weight_decay=1e-12",
+                "--target=pos"
+            ]
+        }
+    ]
+}

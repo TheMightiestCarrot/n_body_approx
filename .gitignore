@@ -3,7 +3,9 @@ run*/
 /wandb/
 
 .idea
-.vscode
+.vscode/*
+# vscode debug config. Nice-to-have for people who use vscode.
+!.vscode/launch.json
 
 __pycache__
 
