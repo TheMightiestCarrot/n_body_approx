@@ -1,37 +1,25 @@
 import math
+
 import numpy as np
 import torch
 import torch.nn as nn
 
 from .base_model import BaseModel
-from .utils import (
-    GaussianSmearing,
-)
-
-from .gaussian_rbf import GaussianRadialBasisLayer
 from .edge_rot_mat import init_edge_rot_mat
-from .so3 import (
-    CoefficientMappingModule,
-    SO3_Embedding,
-    SO3_Grid,
-    SO3_Rotation,
-    SO3_LinearV2,
-)
+from .gaussian_rbf import GaussianRadialBasisLayer
+from .input_block import EdgeDegreeEmbedding
+from .layer_norm import (EquivariantLayerNormArray,
+                         EquivariantLayerNormArraySphericalHarmonics,
+                         EquivariantRMSNormArraySphericalHarmonics,
+                         EquivariantRMSNormArraySphericalHarmonicsV2,
+                         get_normalization_layer)
 from .module_list import ModuleListInfo
 from .radial_function import RadialFunction
-from .layer_norm import (
-    EquivariantLayerNormArray,
-    EquivariantLayerNormArraySphericalHarmonics,
-    EquivariantRMSNormArraySphericalHarmonics,
-    EquivariantRMSNormArraySphericalHarmonicsV2,
-    get_normalization_layer,
-)
-from .transformer_block import (
-    SO2EquivariantGraphAttention,
-    FeedForwardNetwork,
-    TransBlockV2,
-)
-from .input_block import EdgeDegreeEmbedding
+from .so3 import (CoefficientMappingModule, SO3_Embedding, SO3_Grid,
+                  SO3_LinearV2, SO3_Rotation)
+from .transformer_block import (FeedForwardNetwork,
+                                SO2EquivariantGraphAttention, TransBlockV2)
+from .utils import GaussianSmearing
 
 # Statistics of IS2RE 100K
 _AVG_DEGREE = 23.395238876342773  # IS2RE: 100k, max_radius = 5, max_neighbors = 100

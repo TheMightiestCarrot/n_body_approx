@@ -1,9 +1,13 @@
+import argparse
+
 import numpy as np
 import torch
 from torch_cluster import radius_graph
+
 from datasets.nbody import GravityDataset
+
 from .architecture.equiformer_v2_nbody import EquiformerV2_nbody
-import argparse
+
 
 def load_model(model_path, device):
     model = EquiformerV2_nbody().to(device)

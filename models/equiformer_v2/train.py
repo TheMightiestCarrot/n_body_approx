@@ -1,18 +1,16 @@
 import argparse
 import datetime
-from typing import Iterable, Optional
-import torch
 import time
-from torch_geometric.loader import DataLoader
-from datasets.nbody.dataset_gravity import GravityDataset
+from typing import Iterable, Optional
 
+import torch
+import torchmetrics
 import wandb
-
-from models.equiformer_v2.architecture.equiformer_v2_nbody import EquiformerV2_nbody
-
 from timm.utils import ModelEmaV2, dispatch_clip_grad
 
-import torchmetrics
+from datasets.nbody.dataset_gravity import GravityDataset
+from models.equiformer_v2.architecture.equiformer_v2_nbody import \
+    EquiformerV2_nbody
 
 ModelEma = ModelEmaV2
 
@@ -21,13 +19,12 @@ ModelEma = ModelEmaV2
 def get_args_parser():
     parser = argparse.ArgumentParser("Training EquiformerV2 on N-body", add_help=False)
     parser.add_argument("--data-path", type=str, default="datasets/nbody")
-    parser.add_argument("--num-epochs", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--max-samples", type=int, default=3000)
     parser.add_argument("--dataset-name", type=str, default="nbody_small")
     parser.add_argument("--log", type=bool, default=True)
-    parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--test-interval", type=int, default=1)
     
     return parser
