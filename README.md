@@ -1,4 +1,12 @@
 # n_body_approx
+## Installation
+Make sure your interpreter is **Python 3.10!**\
+Then just run this script:
+```
+python INSTALL_script.py
+```
+The script checks if CUDA is available and installs the necessary packages accordingly.
+
 ## Contents
 [set_transformer_one_particle_withmlp_v2.ipynb](set_transformer_one_particle_withmlp_v2.ipynb) - training, results including models and data are logged into tensorboard \
 [set_transformer_encoder_gravity_analysis.ipynb](set_transformer_encoder_gravity_analysis.ipynb) - analysis of tensorboard run id\
