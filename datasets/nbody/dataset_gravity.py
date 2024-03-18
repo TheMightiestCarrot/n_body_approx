@@ -6,6 +6,7 @@ import torch
 from .dataset.synthetic_sim import GravitySim
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
+import random
 
 
 class GravityDataset():
@@ -17,7 +18,7 @@ class GravityDataset():
     os.makedirs(path, exist_ok=True)
 
     def __init__(self, partition='train', max_samples=1e8, dataset_name="nbody_small", bodies=5, neighbours=6,
-                 target="pos"):
+                 target="pos", random_trajectory_sampling=False, steps_to_predict=2):
         self.partition = partition
         if self.partition == 'val':
             self.suffix = 'valid'
@@ -40,6 +41,8 @@ class GravityDataset():
         self.data, self.edges = self.load()
         self.neighbours = int(neighbours)
         self.target = target
+        self.random_trajectory_sampling = random_trajectory_sampling
+        self.steps_to_predict = steps_to_predict
 
     def load(self, path=None):
 
@@ -81,19 +84,32 @@ class GravityDataset():
         loc, vel, force, mass = self.data
         loc, vel, force, mass = loc[i], vel[i], force[i], mass[i]
 
-        if self.dataset_name == "nbody":
-            frame_0, frame_T = 6, 8
-        elif self.dataset_name == "nbody_small":
-            frame_0, frame_T = 30, 40
-        elif self.dataset_name == "nbody_small_out_dist":
-            frame_0, frame_T = 20, 30
+        if self.random_trajectory_sampling:
+            min_frame = 0
+            max_frame = len(loc)
+            separation = self.steps_to_predict
+
+            frame_0 = random.randint(min_frame, max_frame - separation)
+            frame_T = frame_0 + separation
+
         else:
-            raise Exception("Wrong dataset partition %s" % self.dataset_name)
+            if self.dataset_name == "nbody":
+                frame_0, frame_T = 6, 8
+            elif self.dataset_name == "nbody_small":
+                frame_0, frame_T = 30, 40
+            elif self.dataset_name == "nbody_small_out_dist":
+                frame_0, frame_T = 20, 30
+            else:
+                raise Exception("Wrong dataset partition %s" % self.dataset_name)
 
         if self.target == "pos":
             y = loc[frame_T]
         elif self.target == "force":
             y = force[frame_T]
+        elif self.target == "pos_dt+vel_dt":
+            pos_dt = loc[frame_T] - loc[frame_0]  # Change in position
+            vel_dt = vel[frame_T] - vel[frame_0]  # Change in velocity
+            y = torch.cat((pos_dt, vel_dt), dim=0)
 
         return loc[frame_0], vel[frame_0], force[frame_0], mass, y
 
@@ -115,7 +131,7 @@ class GravityDataset():
         return loc, vel, force, mass
 
     @staticmethod
-    def plot_histograms(loc, vel, bins=30):
+    def plot_histograms(loc, vel, force=None, bins=30):
         num_dims = loc.shape[3]  # Update to reflect new indexing due to the additional 'bodies' dimension
         dim_labels = ['x', 'y', 'z'][:num_dims]  # Labels for dimensions
         colors = ['red', 'green', 'blue'][:num_dims]  # Color for each dimension
@@ -123,7 +139,7 @@ class GravityDataset():
         plt.figure(figsize=(10, 5))
 
         # Positions
-        plt.subplot(1, 2, 1)
+        plt.subplot(1, 3, 1)
         for i, (color, label) in enumerate(zip(colors, dim_labels)):
             # Flatten across simulations, steps, and bodies but keep dimensions separate
             plt.hist(loc[:, :, :, i].flatten(), bins=bins, alpha=0.5, color=color, label=f'{label} position')
@@ -131,11 +147,48 @@ class GravityDataset():
         plt.legend()
 
         # Velocities
-        plt.subplot(1, 2, 2)
+        plt.subplot(1, 3, 2)
         for i, (color, label) in enumerate(zip(colors, dim_labels)):
             # Flatten across simulations, steps, and bodies but keep dimensions separate
             plt.hist(vel[:, :, :, i].flatten(), bins=bins, alpha=0.5, color=color, label=f'{label} velocity')
         plt.title('Velocities')
+        plt.legend()
+
+        if force is not None:
+            # Forces
+            plt.subplot(1, 3, 3)
+            for i, (color, label) in enumerate(zip(colors, dim_labels)):
+                # Flatten across simulations, steps, and bodies but keep dimensions separate
+                plt.hist(force[:, :, :, i].flatten(), bins=bins, alpha=0.5, color=color, label=f'{label} force')
+            plt.title('Forces')
+            plt.legend()
+
+        plt.tight_layout()
+        plt.show()
+
+    @staticmethod
+    def plot_differences(loc, vel, step=2, bins=30):
+        num_dims = loc.shape[3]
+        dim_labels = ['x', 'y', 'z'][:num_dims]
+        colors = ['red', 'green', 'blue'][:num_dims]
+
+        plt.figure(figsize=(20, 5))
+
+        # Position Differences
+        plt.subplot(1, 2, 1)
+        for i, (color, label) in enumerate(zip(colors, dim_labels)):
+            # Calculate differences along the steps dimension (axis=1)
+            diffs = np.diff(loc[:, :, :, i], axis=1, n=step).flatten()
+            plt.hist(diffs, bins=bins, alpha=0.5, color=color, label=f'{label} position difference')
+        plt.title('Position Differences')
+        plt.legend()
+
+        # Velocity Differences
+        plt.subplot(1, 2, 2)
+        for i, (color, label) in enumerate(zip(colors, dim_labels)):
+            diffs = np.diff(vel[:, :, :, i], axis=1, n=step).flatten()
+            plt.hist(diffs, bins=bins, alpha=0.5, color=color, label=f'{label} velocity difference')
+        plt.title('Velocity Differences')
         plt.legend()
 
         plt.tight_layout()
@@ -148,8 +201,7 @@ class GravityDataset():
                     range(loc.shape[1])]
         return energies
 
-    def plot_energy_statistics(self):
-        loc, vel, force, mass = self.data
+    def plot_energy_statistics(self, loc, vel):
         num_simulations = loc.shape[0]
 
         with Pool() as pool:

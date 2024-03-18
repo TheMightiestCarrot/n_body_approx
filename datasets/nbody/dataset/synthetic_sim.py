@@ -309,7 +309,8 @@ class GravitySim(object):
 
         self.dim = dim
 
-    def compute_acceleration(self, pos, mass, G, softening):
+    @staticmethod
+    def compute_acceleration(pos, mass, G, softening):
         # positions r = [x,y,z] for all particles
         x = pos[:, 0:1]
         y = pos[:, 1:2]
@@ -330,6 +331,31 @@ class GravitySim(object):
 
         # pack together the acceleration components
         a = np.hstack((ax, ay, az))
+        return a
+
+    @staticmethod
+    def compute_acceleration_multi(pos, mass, G, softening):
+        # pos shape: (groups, particles, dimensions) -> [g, n, 3]
+        x = pos[:, :, 0:1]  # Shape becomes [g, n, 1]
+        y = pos[:, :, 1:2]
+        z = pos[:, :, 2:3]
+
+        # Compute pairwise differences in each dimension [g, n, n]
+        dx = x.transpose(0, 2, 1) - x
+        dy = y.transpose(0, 2, 1) - y
+        dz = z.transpose(0, 2, 1) - z
+
+        # Compute 1/r^3, considering the softening parameter [g, n, n]
+        inv_r3 = (dx ** 2 + dy ** 2 + dz ** 2 + softening ** 2)
+        inv_r3[inv_r3 > 0] = inv_r3[inv_r3 > 0] ** (-1.5)
+
+        # Apply mass and gravitational constant [g, n, 1]
+        ax = G * (dx * inv_r3) @ mass[:, :, None]
+        ay = G * (dy * inv_r3) @ mass[:, :, None]
+        az = G * (dz * inv_r3) @ mass[:, :, None]
+
+        # Combine acceleration components [g, n, 3]
+        a = np.concatenate((ax, ay, az), axis=2)
         return a
 
     def _energy(self, pos, vel, mass, G):

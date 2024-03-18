@@ -73,6 +73,13 @@ def create_argparser():
     parser.add_argument('--neighbours', type=int, default=6,
                         help='Number of connected nearest neighbours')
 
+    # Gravity parameters:
+    parser.add_argument('--steps_to_predict', type=int, default=2,
+                        help='Number of steps to predict')
+
+    parser.add_argument('--random_trajectory_sampling', type=bool, default=True,
+                        help='Whether to use any steps in the training data')
+
     # Model parameters
     parser.add_argument('--model', type=str, default="segnn",
                         help='Model name')
@@ -110,19 +117,19 @@ if __name__ == "__main__":
     #     '--norm=none', '--batch_size=100', '--gpu=1', '--weight_decay=1e-12', '--target=pos'
     # ]
 
-    # sys.argv = [
-    #     'main.py', '--dataset=gravity', '--epochs=5', '--max_samples=3000',
-    #     '--model=segnn', '--lmax_h=1', '--lmax_attr=1', '--layers=4',
-    #     '--hidden_features=64', '--subspace_type=weightbalanced', '--norm=none',
-    #     '--batch_size=100', '--gpu=1', '--weight_decay=1e-12', '--target=pos'
-    # ]
-
     sys.argv = [
-        'main.py', '--dataset=nbody', '--epochs=1000', '--max_samples=3000',
+        'main.py', '--dataset=gravityV2', '--epochs=5', '--max_samples=3000',
         '--model=segnn', '--lmax_h=1', '--lmax_attr=1', '--layers=4',
         '--hidden_features=64', '--subspace_type=weightbalanced', '--norm=none',
-        '--batch_size=100', '--gpu=1', '--weight_decay=1e-12'
+        '--batch_size=100', '--gpu=1', '--weight_decay=1e-12', '--target=pos'
     ]
+
+    # sys.argv = [
+    #     'main.py', '--dataset=nbody', '--epochs=1000', '--max_samples=3000',
+    #     '--model=segnn', '--lmax_h=1', '--lmax_attr=1', '--layers=4',
+    #     '--hidden_features=64', '--subspace_type=weightbalanced', '--norm=none',
+    #     '--batch_size=100', '--gpu=1', '--weight_decay=1e-12'
+    # ]
 
     parser = create_argparser()
 
@@ -144,6 +151,15 @@ if __name__ == "__main__":
         task = "node"
         input_irreps = Irreps("2x1o + 1x0e")
         output_irreps = Irreps("1x1o")
+        edge_attr_irreps = Irreps.spherical_harmonics(args.lmax_attr)
+        node_attr_irreps = Irreps.spherical_harmonics(args.lmax_attr)
+        additional_message_irreps = Irreps("2x0e")
+    elif args.dataset == "gravityV2":
+        from datasets.nbody.train_gravity_V2 import train
+
+        task = "node"
+        input_irreps = Irreps("2x1o + 1x0e")
+        output_irreps = Irreps("2x1o")
         edge_attr_irreps = Irreps.spherical_harmonics(args.lmax_attr)
         node_attr_irreps = Irreps.spherical_harmonics(args.lmax_attr)
         additional_message_irreps = Irreps("2x0e")
@@ -192,7 +208,7 @@ if __name__ == "__main__":
     else:
         raise Exception("Model could not be found")
 
-    if args.dataset == "gravity":
+    if "gravity" in args.dataset:
         print("setting model to double precision")
         model.double()
 
