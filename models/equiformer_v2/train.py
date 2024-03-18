@@ -7,8 +7,8 @@ import torch
 import torchmetrics
 import wandb
 from timm.utils import ModelEmaV2, dispatch_clip_grad
-
 from datasets.nbody.dataset_gravity import GravityDataset
+
 from models.equiformer_v2.architecture.equiformer_v2_nbody import \
     EquiformerV2_nbody
 
@@ -95,7 +95,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         if batch_idx % print_freq == 0 or batch_idx == len(data_loader) - 1:
             w = time.perf_counter() - start_time
             e = (batch_idx + 1) / len(data_loader)
-            info_str = 'Epoch: [{epoch}][{step}/{length}] \t loss: {loss:.5f}, MAE: {mae:.5f}, time/step={time_per_step:.0f}ms, '.format( 
+            info_str = 'Epoch: [{epoch}/{args.epochs}] \t Step: [{step}/{length}] \t Loss: {loss:.5f}, MAE: {mae:.5f}, time/step={time_per_step:.0f}ms, '.format( 
                 epoch=epoch, step=batch_idx, length=len(data_loader), 
                 mae=mae_metric.compute().item(), 
                 loss=loss_metric.compute().item(),
@@ -155,7 +155,7 @@ def main(args):
                   (best_val_loss, best_epoch))
             
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    torch.save(model.state_dict(), f"trained_models/{args.dataset_name}_best_model_{current_time}.pth")
+    torch.save(model.state_dict(), f"runs/{args.dataset_name}_best_model_{current_time}.pth")
 
     return best_val_loss, best_epoch
 
