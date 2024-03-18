@@ -287,7 +287,7 @@ class SO3_Embedding:
     # Reshape the embedding lval -> m
     def _m_primary(self, mapping):
         self.embedding = torch.einsum(
-            "nac, ba -> nbc", self.embedding, mapping.to_m
+            "nac, ba -> nbc", self.embedding.to(dtype=torch.float32), mapping.to_m.to(dtype=torch.float32)
         )
 
     # Reshape the embedding m -> lval
@@ -493,7 +493,7 @@ class SO3_Rotation(torch.nn.Module):
     def rotate(self, embedding, out_lmax: int, out_mmax: int):
         out_mask = self.mapping.coefficient_idx(out_lmax, out_mmax)
         wigner = self.wigner[:, out_mask, :]
-        return torch.bmm(wigner, embedding)
+        return torch.bmm(wigner.to(dtype=torch.float64), embedding)
 
     # Rotate the embedding by the inverse of the rotation matrix
     def rotate_inv(self, embedding, in_lmax: int, in_mmax: int):
@@ -725,7 +725,7 @@ class SO3_LinearV2(torch.nn.Module):
             self.weight, dim=0, index=self.expand_index
         )  # [(L_max + 1) ** 2, C_out, C_in]
         out = torch.einsum(
-            "bmi, moi -> bmo", input_embedding.embedding, weight
+            "bmi, moi -> bmo", input_embedding.embedding.to(dtype=torch.float32), weight.to(dtype=torch.float32)
         )  # [N, (L_max + 1) ** 2, C_out]
         bias = self.bias.view(1, 1, self.out_features)
         out[:, 0:1, :] = out.narrow(1, 0, 1) + bias

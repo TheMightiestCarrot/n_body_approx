@@ -236,10 +236,10 @@ class SO2EquivariantGraphAttention(torch.nn.Module):
         if self.use_atom_edge_embedding:
             source_element = atomic_numbers[
                 edge_index[0]
-            ]  # Source atom atomic number
+            ].long()  # Source atom atomic number
             target_element = atomic_numbers[
                 edge_index[1]
-            ]  # Target atom atomic number
+            ].long()  # Target atom atomic number
             source_embedding = self.source_embedding(source_element)
             target_embedding = self.target_embedding(target_element)
             x_edge = torch.cat(

@@ -89,8 +89,8 @@ class EdgeDegreeEmbedding(torch.nn.Module):
             target_element = atomic_numbers[
                 edge_index[1]
             ]  # Target atom atomic number
-            source_embedding = self.source_embedding(source_element)
-            target_embedding = self.target_embedding(target_element)
+            source_embedding = self.source_embedding(source_element.long())
+            target_embedding = self.target_embedding(target_element.long())
             x_edge = torch.cat(
                 (edge_distance, source_embedding, target_embedding), dim=1
             )

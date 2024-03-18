@@ -410,7 +410,7 @@ class EquivariantRMSNormArraySphericalHarmonicsV2(nn.Module):
             if self.std_balance_degrees:
                 feature_norm = feature.pow(2)  # [N, (L_max + 1)**2, C]
                 feature_norm = torch.einsum(
-                    "nic, ia -> nac", feature_norm, self.balance_degree_weight
+                    "nic, ia -> nac", feature_norm.to(dtype=torch.float32), self.balance_degree_weight.to(dtype=torch.float32)
                 )  # [N, 1, C]
             else:
                 feature_norm = feature.pow(2).mean(
