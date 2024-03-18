@@ -32,8 +32,6 @@ class GravityDataset():
         else:
             raise Exception("Wrong dataset name %s" % self.dataset_name)
 
-        assert target in ["pos", "force"]
-
         self.metadata = {}
         self.simulation = None
         self.max_samples = int(max_samples)
@@ -86,8 +84,8 @@ class GravityDataset():
 
         if self.random_trajectory_sampling:
             min_frame = 0
-            max_frame = len(loc)
             separation = self.steps_to_predict
+            max_frame = len(loc) - separation
 
             frame_0 = random.randint(min_frame, max_frame - separation)
             frame_T = frame_0 + separation
@@ -109,7 +107,8 @@ class GravityDataset():
         elif self.target == "pos_dt+vel_dt":
             pos_dt = loc[frame_T] - loc[frame_0]  # Change in position
             vel_dt = vel[frame_T] - vel[frame_0]  # Change in velocity
-            y = torch.cat((pos_dt, vel_dt), dim=0)
+            # y = torch.cat((pos_dt, vel_dt), dim=0)
+            y = np.concatenate((pos_dt, vel_dt), axis=1)
 
         return loc[frame_0], vel[frame_0], force[frame_0], mass, y
 

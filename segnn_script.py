@@ -121,7 +121,7 @@ if __name__ == "__main__":
         'main.py', '--dataset=gravityV2', '--epochs=5', '--max_samples=3000',
         '--model=segnn', '--lmax_h=1', '--lmax_attr=1', '--layers=4',
         '--hidden_features=64', '--subspace_type=weightbalanced', '--norm=none',
-        '--batch_size=100', '--gpu=1', '--weight_decay=1e-12', '--target=pos'
+        '--batch_size=100', '--gpu=1', '--weight_decay=1e-12', '--target=pos_dt+vel_dt'
     ]
 
     # sys.argv = [
