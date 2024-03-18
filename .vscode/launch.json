@@ -2,7 +2,7 @@
     "version": "1.0.0",
     "configurations": [
         {
-            "name": "Python: Train nbody-approx",
+            "name": "Python: Train segnn",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/segnn_script.py",
@@ -24,6 +24,15 @@
                 "--weight_decay=1e-12",
                 "--target=pos"
             ]
+        },
+        {
+            "name": "Python: Train equiformer_v2",
+            "type": "python",
+            "request": "launch",
+            "module": "models.equiformer_v2.train",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }
