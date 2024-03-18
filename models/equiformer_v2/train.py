@@ -1,14 +1,15 @@
 import argparse
 import datetime
+import os
 import time
 from typing import Iterable, Optional
 
 import torch
 import torchmetrics
-import wandb
 from timm.utils import ModelEmaV2, dispatch_clip_grad
-from datasets.nbody.dataset_gravity import GravityDataset
 
+import wandb
+from datasets.nbody.dataset_gravity import GravityDataset
 from models.equiformer_v2.architecture.equiformer_v2_nbody import \
     EquiformerV2_nbody
 
@@ -19,12 +20,12 @@ ModelEma = ModelEmaV2
 def get_args_parser():
     parser = argparse.ArgumentParser("Training EquiformerV2 on N-body", add_help=False)
     parser.add_argument("--data-path", type=str, default="datasets/nbody")
-    parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--max-samples", type=int, default=3000)
     parser.add_argument("--dataset-name", type=str, default="nbody_small")
     parser.add_argument("--log", type=bool, default=True)
-    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--test-interval", type=int, default=1)
     parser.add_argument("--num-atoms", type=int, default=5)
     
@@ -151,7 +152,10 @@ def main(args):
                   (best_val_loss, best_epoch))
             
     current_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-    torch.save(model.state_dict(), f"runs/{args.dataset_name}_best_model_{current_time}.pth")
+    # create the directory if it doesn't exist
+    save_dir_path = 'models/equiformer_v2/runs'
+    os.makedirs(save_dir_path, exist_ok=True)
+    torch.save(model.state_dict(), f"{save_dir_path}/{args.dataset_name}_best_model_{current_time}.pth")
 
     return best_val_loss, best_epoch
 
