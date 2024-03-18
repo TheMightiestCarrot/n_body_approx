@@ -95,13 +95,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         if batch_idx % print_freq == 0 or batch_idx == len(data_loader) - 1:
             w = time.perf_counter() - start_time
             e = (batch_idx + 1) / len(data_loader)
-            info_str = 'Epoch: [{epoch}/{args.epochs}] \t Step: [{step}/{length}] \t Loss: {loss:.5f}, MAE: {mae:.5f}, time/step={time_per_step:.0f}ms, '.format( 
-                epoch=epoch, step=batch_idx, length=len(data_loader), 
-                mae=mae_metric.compute().item(), 
-                loss=loss_metric.compute().item(),
-                time_per_step=(1e3 * w / e / len(data_loader))
-                )
-            info_str += 'lr={:.2e}'.format(optimizer.param_groups[0]["lr"])
+            info_str = f'Epoch: [{epoch}/{args.epochs}] \t Step: [{batch_idx}/{len(data_loader)}] \t Loss: {loss_metric.compute().item():.5f}, MAE: {mae_metric.compute().item():.5f}, time/step={(1e3 * w / e / len(data_loader)):.0f}ms'
+            info_str += f', lr={optimizer.param_groups[0]["lr"]:.2e}'
             print(info_str)
 
         res['counter'] += batch_data[0].size(0)
