@@ -323,7 +323,7 @@ class EquiformerV2_nbody(BaseModel):
         self.apply(self._uniform_init_rad_func_linear_weights)
 
     # TODO: consider using conditional gradients: https://github.com/Open-Catalyst-Project/ocp/blob/9108a87ce383b2982c24eff4178632f01fecb63e/ocpmodels/common/utils.py#L129C1-L143C21
-    def forward(self, data, batch_idx):
+    def forward(self, data, batch_idx, batch_size, num_atoms):
         loc_frame_0, vel_frame_0, edge_attr, charges = data
         # Extract relevant information from the input data
         num_atoms = loc_frame_0.size(0)
@@ -338,7 +338,7 @@ class EquiformerV2_nbody(BaseModel):
             cell_offsets,
             _,  # cell offset distances
             neighbors,
-        ) = self.generate_graph(data)
+        ) = self.generate_graph(data, batch_size, num_atoms)
 
         ###############################################################
         # Initialize data structures

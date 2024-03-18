@@ -7,17 +7,16 @@ import torch
 from torch_scatter import segment_coo, segment_csr
 
 
-def compute_neighbors(data, edge_index, batch_size):
+def compute_neighbors(data, edge_index, batch_size, num_atoms):
     # Get number of neighbors
     # segment_coo assumes sorted index
     ones = edge_index[1].new_ones(1).expand_as(edge_index[1])
     natoms = (
         data.natoms
         if "natoms" in data
-        else torch.tensor([[5]] * 32, device=data[0].device)
-    )  # TODO: do properly
+        else torch.tensor([[num_atoms]] * batch_size, device=data[0].device))
     num_neighbors = segment_coo(
-        ones, edge_index[1], dim_size=natoms.sum() if "natoms" in data else 160
+        ones, edge_index[1], dim_size=natoms.sum() if "natoms" in data else batch_size * num_atoms
     )
 
     # Get number of neighbors per image

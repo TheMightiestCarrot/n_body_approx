@@ -26,6 +26,7 @@ def get_args_parser():
     parser.add_argument("--log", type=bool, default=True)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--test-interval", type=int, default=1)
+    parser.add_argument("--num-atoms", type=int, default=5)
     
     return parser
 
@@ -64,7 +65,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         data = tuple(d.to(device) for d in data)
         target = loc_end.to(device)
         
-        pred = model(data, batch_idx)
+        pred = model(data, batch_idx, args.batch_size, args.num_atoms)
         pred = pred.squeeze()
         
         loss = criterion(pred, target)
