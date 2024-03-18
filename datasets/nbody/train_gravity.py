@@ -115,7 +115,7 @@ def run_epoch(model, optimizer, criterion, epoch, loader, transform, device, arg
 
         if args.model == 'segnn' or args.model == 'seconv':
             graph = Data(pos=loc, vel=vel, force=force, mass=mass, y=y)
-            batch = torch.arange(0, batch_size)
+            batch = torch.arange(0, batch_size).to(device)
             graph.batch = batch.repeat_interleave(n_nodes).long()
             graph.edge_index = knn_graph(loc, args.neighbours, graph.batch)
 

@@ -1,4 +1,14 @@
 /config.ini
 run*/
 /wandb/
+
 .idea
+.vscode/*
+# vscode debug config. Nice-to-have for people who use vscode.
+!.vscode/launch.json
+
+__pycache__
+
+*.npy
+
+segnn_runs/*
