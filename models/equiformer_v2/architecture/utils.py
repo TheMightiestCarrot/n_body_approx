@@ -24,7 +24,7 @@ def compute_neighbors(data, edge_index, batch_size):
     image_indptr = torch.zeros(
         natoms.shape[0] + 1, device=data[0].device, dtype=torch.long
     )
-    image_indptr[1:] = torch.cumsum(natoms, dim=0)
+    image_indptr[1:] = torch.cumsum(natoms.squeeze(), dim=0)
     neighbors = segment_csr(num_neighbors, image_indptr)
     return neighbors
 
