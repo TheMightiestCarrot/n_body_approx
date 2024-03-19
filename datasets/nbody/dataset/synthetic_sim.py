@@ -335,8 +335,14 @@ class GravitySim(object):
 
     @staticmethod
     def compute_force_batched(pos, mass, G, softening, batch_size):
+        num_particles = pos.shape[0]
+
+        # Ensure batch_size is a divisor of num_particles, else process as a single batch
+        if num_particles % batch_size != 0:
+            batch_size = num_particles
+
         # Calculate the number of bodies per batch
-        num_bodies = pos.shape[0] // batch_size
+        num_bodies = num_particles // batch_size
 
         # Reshape pos and mass to separate the batches
         pos = pos.reshape(batch_size, num_bodies, -1)
@@ -357,7 +363,7 @@ class GravitySim(object):
             dz = z.T - z
 
             # Compute 1/r^3 for all pairwise particle separations in the batch
-            inv_r3 = (dx**2 + dy**2 + dz**2 + softening**2)
+            inv_r3 = (dx ** 2 + dy ** 2 + dz ** 2 + softening ** 2)
             inv_r3[inv_r3 > 0] = inv_r3[inv_r3 > 0] ** (-1.5)
 
             # Compute acceleration components for the current batch
@@ -371,9 +377,9 @@ class GravitySim(object):
             # Store the computed acceleration for the current batch
             acceleration[b, :, :] = a
 
-        # Reshape the acceleration array back to match the input batched shape
+        # Reshape the acceleration array back to match the input shape, accounting for the batch adjustment
         acceleration = acceleration * mass
-        acceleration = acceleration.reshape(batch_size * num_bodies, -1)
+        acceleration = acceleration.reshape(-1, 3)  # Assuming 3D coordinates
         return acceleration
 
     def _energy(self, pos, vel, mass, G):
@@ -542,16 +548,24 @@ class GravitySim(object):
 
             ax.legend(handles=legend_lines)
 
+            max_actual_index = actual_pos.shape[0] - 1
+            if predicted_pos is not None:
+                max_predicted_steps = predicted_pos.shape[0] - 1
+            else:
+                max_predicted_steps = 0
+
+            slider_max = max(max_actual_index, max_predicted_steps)
+
             if not offline_plot:
                 ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03])
-                slider = Slider(ax_slider, 'Time Step', 0, actual_pos.shape[0] - 1, valinit=0, valfmt='%0.0f')
+                slider = Slider(ax_slider, 'Time Step', 0, slider_max, valinit=0, valfmt='%0.0f')
 
             def on_key(event):
                 if event.key == 'left':
                     new_val = max(0, slider.val - 1)
                     slider.set_val(new_val)
                 elif event.key == 'right':
-                    new_val = min(actual_pos.shape[0] - 1, slider.val + 1)
+                    new_val = min(slider_max, slider.val + 1)
                     slider.set_val(new_val)
 
             def update(val):
@@ -561,41 +575,38 @@ class GravitySim(object):
                     time_step = int(val)
 
                 start_step = max(0, time_step - trace_length)
+                last_actual_step = min(time_step, max_actual_index)
+                last_predicted_step = min(time_step, max_predicted_steps)
 
                 for pi in range(actual_pos.shape[1]):
-                    actual_lines[pi].set_data(actual_pos[start_step:time_step + 1, pi, 0],
-                                              actual_pos[start_step:time_step + 1, pi, 1])
-                    actual_lines[pi].set_3d_properties(actual_pos[start_step:time_step + 1, pi, 2])
+                    actual_lines[pi].set_data(actual_pos[start_step:last_actual_step + 1, pi, 0],
+                                              actual_pos[start_step:last_actual_step + 1, pi, 1])
+                    actual_lines[pi].set_3d_properties(actual_pos[start_step:last_actual_step + 1, pi, 2])
 
                 # Update predicted particle(s)
                 if predicted_pos is not None:
                     if particle_index is not None:
-                        # Plot specific predicted particle
-                        predicted_line.set_data(predicted_pos[start_step:time_step + 1, particle_index, 0],
-                                                predicted_pos[start_step:time_step + 1, particle_index, 1])
-                        predicted_line.set_3d_properties(predicted_pos[start_step:time_step + 1, particle_index, 2])
+                        # Adjust predicted_line to plot up to the last predicted step
+                        predicted_line.set_data(predicted_pos[start_step:last_predicted_step + 1, particle_index, 0],
+                                                predicted_pos[start_step:last_predicted_step + 1, particle_index, 1])
+                        predicted_line.set_3d_properties(
+                            predicted_pos[start_step:last_predicted_step + 1, particle_index, 2])
                     else:
-                        # Plot all predicted particles
+                        # Adjust each predicted particle to plot up to the last predicted step
                         for pi in range(predicted_pos.shape[1]):
-                            predicted_lines[pi].set_data(predicted_pos[start_step:time_step + 1, pi, 0],
-                                                         predicted_pos[start_step:time_step + 1, pi, 1])
-                            predicted_lines[pi].set_3d_properties(predicted_pos[start_step:time_step + 1, pi, 2])
+                            predicted_lines[pi].set_data(predicted_pos[start_step:last_predicted_step + 1, pi, 0],
+                                                         predicted_pos[start_step:last_predicted_step + 1, pi, 1])
+                            predicted_lines[pi].set_3d_properties(
+                                predicted_pos[start_step:last_predicted_step + 1, pi, 2])
 
                 if offline_plot:
-                    return actual_lines + [predicted_line]
+                    return actual_lines + (
+                        [predicted_line] if predicted_pos is not None and particle_index is not None else [])
                 else:
                     fig.canvas.draw_idle()
 
             if not offline_plot:
                 fig.canvas.mpl_connect('key_press_event', on_key)
-
-                def on_key(event):
-                    if event.key == 'left':
-                        new_val = max(0, slider.val - 1)
-                        slider.set_val(new_val)
-                    elif event.key == 'right':
-                        new_val = min(actual_pos.shape[0] - 1, slider.val + 1)
-                        slider.set_val(new_val)
 
                 update(0)
                 slider.on_changed(update)
