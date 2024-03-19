@@ -1,6 +1,12 @@
-from synthetic_sim import ChargedParticlesSim, SpringSim, GravitySim
-from datasets.nbody.dataset_nbody import NBodyDataset
+import sys
+from pathlib import Path
+
+project_root = Path(__file__).parents[3]
+sys.path.append(str(project_root))
+
 from datasets.nbody.dataset_gravity import GravityDataset
+from datasets.nbody.dataset_nbody import NBodyDataset
+from synthetic_sim import ChargedParticlesSim, SpringSim, GravitySim
 import time
 import numpy as np
 import argparse

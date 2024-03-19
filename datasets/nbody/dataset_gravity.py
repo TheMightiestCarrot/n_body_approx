@@ -33,7 +33,7 @@ class GravityDataset():
             raise Exception("Wrong dataset name %s" % self.dataset_name)
 
         self.metadata = {}
-        self.simulation = None
+        self.simulation: GravitySim = None
         self.max_samples = int(max_samples)
         self.dataset_name = dataset_name
         self.data, self.edges = self.load()
@@ -230,37 +230,6 @@ class GravityDataset():
         plt.grid(True)
         plt.tight_layout()
         plt.show()
-
-    # def plot_energy_distributions(self, time_point=None, bins=50):
-    #     loc, vel, force, mass = self.data
-    #
-    #     if time_point is None:
-    #         num_simulations = loc.shape[0]
-    #         with Pool() as pool:
-    #             energies = pool.map(self.simulate_one, range(0, num_simulations))
-    #     energies_array = np.array(energies)
-    #
-    #     if time_point is not None:
-    #         # If a specific time point is provided, use it
-    #         energy_slice = energies_array[:, time_point, :]
-    #     else:
-    #         # Otherwise, calculate the average energy across all time points
-    #         energy_slice = energies_array.mean(axis=1)
-    #
-    #     energy_types = ['Kinetic Energy', 'Potential Energy', 'Total Energy']
-    #     colors = ['red', 'blue', 'green']
-    #
-    #     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-    #     fig.suptitle('Energy Distributions' + (' at Time Point {}'.format(time_point) if time_point is not None else ' - Averages'))
-    #
-    #     for i, ax in enumerate(axes):
-    #         ax.hist(energy_slice[:, i], bins=bins, color=colors[i], alpha=0.7, density=True)
-    #         ax.set_title(energy_types[i])
-    #         ax.set_xlabel('Energy')
-    #         ax.set_ylabel('Density')
-    #
-    #     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    #     plt.show()
 
     def plot_energy_distributions_across_all_sims(self, bins=50):
         loc, vel, force, mass = self.data

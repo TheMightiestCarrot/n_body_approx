@@ -334,29 +334,47 @@ class GravitySim(object):
         return a
 
     @staticmethod
-    def compute_acceleration_multi(pos, mass, G, softening):
-        # pos shape: (groups, particles, dimensions) -> [g, n, 3]
-        x = pos[:, :, 0:1]  # Shape becomes [g, n, 1]
-        y = pos[:, :, 1:2]
-        z = pos[:, :, 2:3]
+    def compute_force_batched(pos, mass, G, softening, batch_size):
+        # Calculate the number of bodies per batch
+        num_bodies = pos.shape[0] // batch_size
 
-        # Compute pairwise differences in each dimension [g, n, n]
-        dx = x.transpose(0, 2, 1) - x
-        dy = y.transpose(0, 2, 1) - y
-        dz = z.transpose(0, 2, 1) - z
+        # Reshape pos and mass to separate the batches
+        pos = pos.reshape(batch_size, num_bodies, -1)
+        mass = mass.reshape(batch_size, num_bodies, -1)
 
-        # Compute 1/r^3, considering the softening parameter [g, n, n]
-        inv_r3 = (dx ** 2 + dy ** 2 + dz ** 2 + softening ** 2)
-        inv_r3[inv_r3 > 0] = inv_r3[inv_r3 > 0] ** (-1.5)
+        # Prepare to store acceleration for all batches
+        acceleration = np.zeros_like(pos)
 
-        # Apply mass and gravitational constant [g, n, 1]
-        ax = G * (dx * inv_r3) @ mass[:, :, None]
-        ay = G * (dy * inv_r3) @ mass[:, :, None]
-        az = G * (dz * inv_r3) @ mass[:, :, None]
+        for b in range(batch_size):
+            # Extract positions for the current batch
+            x = pos[b, :, 0:1]
+            y = pos[b, :, 1:2]
+            z = pos[b, :, 2:3]
 
-        # Combine acceleration components [g, n, 3]
-        a = np.concatenate((ax, ay, az), axis=2)
-        return a
+            # Compute pairwise particle separations for the current batch
+            dx = x.T - x
+            dy = y.T - y
+            dz = z.T - z
+
+            # Compute 1/r^3 for all pairwise particle separations in the batch
+            inv_r3 = (dx**2 + dy**2 + dz**2 + softening**2)
+            inv_r3[inv_r3 > 0] = inv_r3[inv_r3 > 0] ** (-1.5)
+
+            # Compute acceleration components for the current batch
+            ax = G * (dx * inv_r3) @ mass[b]
+            ay = G * (dy * inv_r3) @ mass[b]
+            az = G * (dz * inv_r3) @ mass[b]
+
+            # Pack together the acceleration components for the current batch
+            a = np.hstack((ax, ay, az))
+
+            # Store the computed acceleration for the current batch
+            acceleration[b, :, :] = a
+
+        # Reshape the acceleration array back to match the input batched shape
+        acceleration = acceleration * mass
+        acceleration = acceleration.reshape(batch_size * num_bodies, -1)
+        return acceleration
 
     def _energy(self, pos, vel, mass, G):
         # Kinetic Energy:
