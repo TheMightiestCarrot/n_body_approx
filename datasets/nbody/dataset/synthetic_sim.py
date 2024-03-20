@@ -502,7 +502,8 @@ class GravitySim(object):
     def interactive_trajectory_plot_all_particles_3d(actual_pos, predicted_pos=None, particle_index=None, boxSize=1,
                                                      dims=3,
                                                      offline_plot=False, loggers=[],
-                                                     video_tag="trajectories all particles 3D", trace_length=10):
+                                                     video_tag="trajectories all particles 3D", trace_length=10,
+                                                     alpha=0.2):
         import matplotlib
         from matplotlib.widgets import Slider
         import traceback
@@ -532,14 +533,16 @@ class GravitySim(object):
                 '' if particle_index is None else f'with predicted particle {str(particle_index)}'))
 
             plt.subplots_adjust(bottom=0.25)
-            actual_lines = [ax.plot([], [], [], 'b-', label='Actual')[0] for _ in range(actual_pos.shape[1])]
+            actual_lines = [ax.plot([], [], [], 'b-', label='Actual', alpha=alpha)[0] for _ in
+                            range(actual_pos.shape[1])]
 
             if predicted_pos is not None:
                 if particle_index is None:
                     num_predicted_particles = predicted_pos.shape[1]
-                    predicted_lines = [ax.plot([0], [0], [0], 'r-')[0] for _ in range(num_predicted_particles)]
+                    predicted_lines = [ax.plot([0], [0], [0], 'r-', alpha=alpha)[0] for _ in
+                                       range(num_predicted_particles)]
                 else:
-                    predicted_line, = ax.plot([], [], [], 'r-', label='Predicted')
+                    predicted_line, = ax.plot([], [], [], 'r-', label='Predicted', alpha=alpha)
 
             from matplotlib.lines import Line2D
             legend_lines = [Line2D([0], [0], color='blue', lw=2, label='Actual')]
@@ -553,6 +556,16 @@ class GravitySim(object):
                 max_predicted_steps = predicted_pos.shape[0] - 1
             else:
                 max_predicted_steps = 0
+
+            # markers for first position
+            current_actual_markers = [ax.scatter([], [], [], color='blue', marker='o', s=3, depthshade=False) for _ in
+                                      range(actual_pos.shape[1])]
+
+            if predicted_pos is not None:
+                current_predicted_markers = [ax.scatter([], [], [], color='red', marker='o', s=3, depthshade=False) for
+                                             _ in range(predicted_pos.shape[1])]
+            else:
+                current_predicted_markers = []
 
             slider_max = max(max_actual_index, max_predicted_steps)
 
@@ -583,6 +596,11 @@ class GravitySim(object):
                                               actual_pos[start_step:last_actual_step + 1, pi, 1])
                     actual_lines[pi].set_3d_properties(actual_pos[start_step:last_actual_step + 1, pi, 2])
 
+                    # marker
+                    current_actual_markers[pi]._offsets3d = (
+                        actual_pos[last_actual_step, pi, 0:1], actual_pos[last_actual_step, pi, 1:2],
+                        actual_pos[last_actual_step, pi, 2:3])
+
                 # Update predicted particle(s)
                 if predicted_pos is not None:
                     if particle_index is not None:
@@ -591,6 +609,10 @@ class GravitySim(object):
                                                 predicted_pos[start_step:last_predicted_step + 1, particle_index, 1])
                         predicted_line.set_3d_properties(
                             predicted_pos[start_step:last_predicted_step + 1, particle_index, 2])
+                        current_actual_markers[pi]._offsets3d = (
+                        actual_pos[last_actual_step, pi, 0:1], actual_pos[last_actual_step, pi, 1:2],
+                        actual_pos[last_actual_step, pi, 2:3])
+
                     else:
                         # Adjust each predicted particle to plot up to the last predicted step
                         for pi in range(predicted_pos.shape[1]):
@@ -598,6 +620,9 @@ class GravitySim(object):
                                                          predicted_pos[start_step:last_predicted_step + 1, pi, 1])
                             predicted_lines[pi].set_3d_properties(
                                 predicted_pos[start_step:last_predicted_step + 1, pi, 2])
+                            current_predicted_markers[pi]._offsets3d = (
+                            predicted_pos[last_predicted_step, pi, 0:1], predicted_pos[last_predicted_step, pi, 1:2],
+                            predicted_pos[last_predicted_step, pi, 2:3])
 
                 if offline_plot:
                     return actual_lines + (
