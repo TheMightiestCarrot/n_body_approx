@@ -18,6 +18,7 @@ class GravityDataset():
 
     GROUND_TRUTH_FILE_PREFIXES = ['loc', 'vel', 'forces', 'masses']
     DEFAULT_DATA_PATH = os.path.join(pathlib.Path(__file__).parent.absolute(), 'dataset', 'gravity')
+    os.makedirs(DEFAULT_DATA_PATH, exist_ok=True)
 
     def __init__(self, partition='train', max_samples=1e8, dataset_name="nbody_small", bodies=5, neighbours=6,
                  target="pos", random_trajectory_sampling=False, steps_to_predict=2, path=DEFAULT_DATA_PATH):
