@@ -81,19 +81,18 @@ else:
     raise ValueError('Simulation {} not implemented'.format(args.simulation))
 
 suffix += str(args.n_balls) + "_initvel%d" % args.initial_vel + args.suffix
-np.random.seed(args.seed)
 
 
 def sample_trajectory_wrapper(args):
-    index, length, sample_freq = args
-    np.random.seed(index)  # Ensure different seeds for different processes
+    index, length, sample_freq, seed = args
+    np.random.seed(seed)
     return sim.sample_trajectory(T=length, sample_freq=sample_freq)
 
 
-def generate_dataset(num_sims, length, sample_freq):
+def generate_dataset(num_sims, length, sample_freq, base_seed):
     with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
         # Create an iterable with arguments for each simulation run
-        args_iter = [(i, length, sample_freq) for i in range(num_sims)]
+        args_iter = [(i, length, sample_freq, base_seed + i) for i in range(num_sims)]
 
         # Map the sample_trajectory_wrapper function across the input iterable
         results = pool.map(sample_trajectory_wrapper, args_iter)
@@ -111,20 +110,24 @@ def generate_dataset(num_sims, length, sample_freq):
 
 
 if __name__ == "__main__":
+    np.random.seed(args.seed)  # Set the base seed
     print("Generating {} training simulations".format(args.num_train))
     loc_train, vel_train, edges_train, charges_train = generate_dataset(args.num_train,
                                                                         args.length,
-                                                                        args.sample_freq)
+                                                                        args.sample_freq,
+                                                                        args.seed)
 
     print("Generating {} validation simulations".format(args.num_valid))
     loc_valid, vel_valid, edges_valid, charges_valid = generate_dataset(args.num_valid,
                                                                         args.length,
-                                                                        args.sample_freq)
+                                                                        args.sample_freq,
+                                                                        args.seed + 100000)  # Offset the seed for validation
 
     print("Generating {} test simulations".format(args.num_test))
     loc_test, vel_test, edges_test, charges_test = generate_dataset(args.num_test,
                                                                     args.length_test,
-                                                                    args.sample_freq)
+                                                                    args.sample_freq,
+                                                                    args.seed + 200000)  # Offset the seed for testing
 
     if args.simulation == 'gravity':
         edges = "forces"
