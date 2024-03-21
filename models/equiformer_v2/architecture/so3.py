@@ -503,7 +503,7 @@ class SO3_Rotation(torch.nn.Module):
             in_lmax, in_mmax
         )
         wigner_inv = wigner_inv * wigner_inv_rescale
-        return torch.bmm(wigner_inv, embedding)
+        return torch.bmm(wigner_inv.double(), embedding.double())
 
     # Compute Wigner matrices from rotation matrix
     def RotationToWignerDMatrix(
