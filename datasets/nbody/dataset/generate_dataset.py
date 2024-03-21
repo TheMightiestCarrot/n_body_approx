@@ -76,7 +76,7 @@ elif args.simulation == 'gravity':
     sim = GravitySim(noise_var=args.noise_var, n_balls=args.n_balls, vel_norm=args.initial_vel_norm,
                      interaction_strength=args.G, dt=args.dt)
     suffix = '_gravity'
-    save_path = GravityDataset.path
+    save_path = GravityDataset.DEFAULT_DATA_PATH
 else:
     raise ValueError('Simulation {} not implemented'.format(args.simulation))
 

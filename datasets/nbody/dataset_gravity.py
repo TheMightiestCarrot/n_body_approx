@@ -17,11 +17,10 @@ class GravityDataset():
     """
 
     GROUND_TRUTH_FILE_PREFIXES = ['loc', 'vel', 'forces', 'masses']
-
-    
+    DEFAULT_DATA_PATH = os.path.join(pathlib.Path(__file__).parent.absolute(), 'dataset', 'gravity')
 
     def __init__(self, partition='train', max_samples=1e8, dataset_name="nbody_small", bodies=5, neighbours=6,
-                 target="pos", random_trajectory_sampling=False, steps_to_predict=2, path=os.path.join(pathlib.Path(__file__).parent.absolute(), 'dataset', 'gravity')):
+                 target="pos", random_trajectory_sampling=False, steps_to_predict=2, path=DEFAULT_DATA_PATH):
         self.partition = partition
         if self.partition == 'val':
             self.suffix = 'valid'
@@ -53,7 +52,8 @@ class GravityDataset():
         if path is None:
             path = self.path
 
-        loc, vel, force, mass = [np.load(os.path.join(path, f"{prefix}_{self.suffix}.npy")) for prefix in self.GROUND_TRUTH_FILE_PREFIXES]
+        loc, vel, force, mass = [np.load(os.path.join(path, f"{prefix}_{self.suffix}.npy")) for prefix in
+                                 self.GROUND_TRUTH_FILE_PREFIXES]
 
         self.num_nodes = loc.shape[-1]
 
