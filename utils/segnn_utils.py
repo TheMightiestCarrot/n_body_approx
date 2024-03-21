@@ -182,8 +182,7 @@ def self_feed_batch_prediction(model, data, simulation_instance, args, device,
     loc, vel, force = [d.reshape(-1, 3) for d in [loc, vel, force]]
     mass = mass.repeat(n_nodes, 1)
 
-    predictions = []
-    predicted_locs = []
+    states = []
 
     for step in range(steps):
         batch = torch.arange(0, n_sims)
@@ -211,18 +210,15 @@ def self_feed_batch_prediction(model, data, simulation_instance, args, device,
         force = torch.from_numpy(force)
         # force = force_copy[simulation_index, step]
 
-        predictions.append(prediction.copy())
-        predicted_locs.append(loc.clone())
+        states.append((loc.clone(), vel.clone(), force.clone()))
 
-    all_steps = np.stack(predictions)
-    all_steps_reshaped = all_steps.reshape(steps, n_sims, n_nodes, output_dims * 2)
-    all_steps_reshaped_transposed = all_steps_reshaped.transpose(1, 0, 2, 3)
+    states = np.stack(states)  # [steps, loc+vel+force, n_nodes x sims, dims]
+    states = states.transpose(1, 0, 2, 3)  # [loc+vel+force, steps, n_nodes x sims, dims]
+    all_steps_reshaped = states.reshape(3, steps, n_sims, n_nodes,
+                                        output_dims)  # [loc+vel+force, steps, sims, n_nodes, dims]
+    all_steps_reshaped = all_steps_reshaped.transpose(0, 2, 1, 3, 4)  # [loc+vel+force, sims, steps, n_nodes, dims]
 
-    predicted_locs = np.stack(predicted_locs)
-    predicted_locs_reshaped = predicted_locs.reshape(steps, n_sims, n_nodes, output_dims)
-    predicted_locs_reshaped_transposed = predicted_locs_reshaped.transpose(1, 0, 2, 3)
-
-    return predicted_locs_reshaped_transposed, all_steps_reshaped_transposed
+    return all_steps_reshaped[0, ...], all_steps_reshaped[1, ...], all_steps_reshaped[2, ...]
 
 
 def batch_prediction(model, data, args, device, simulation_indices=(i for i in range(10))):
