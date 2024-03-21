@@ -164,7 +164,7 @@ class EquiformerV2_nbody(BaseModel):
         self.weight_init = weight_init
         assert self.weight_init in ["normal", "uniform"]
 
-        self.device = torch.cuda.current_device()
+        self.device = torch.cuda.current_device() if torch.cuda.is_available() else 'cpu'
 
         self.grad_forces = False
         self.num_resolutions = len(self.lmax_list)
@@ -323,13 +323,14 @@ class EquiformerV2_nbody(BaseModel):
         self.apply(self._uniform_init_rad_func_linear_weights)
 
     # TODO: consider using conditional gradients: https://github.com/Open-Catalyst-Project/ocp/blob/9108a87ce383b2982c24eff4178632f01fecb63e/ocpmodels/common/utils.py#L129C1-L143C21
-    def forward(self, data, batch_idx, batch_size, num_atoms):
+    def forward(self, data, batch):
+        batch_size = max(batch) + 1
         loc_frame_0, vel_frame_0, edge_attr, charges = data
         # Extract relevant information from the input data
-        num_atoms = loc_frame_0.size(0)
         pos = loc_frame_0
         vel = vel_frame_0
         atomic_numbers = charges.reshape(-1)
+        num_atoms = len(atomic_numbers)
 
         (
             edge_index,
@@ -399,10 +400,7 @@ class EquiformerV2_nbody(BaseModel):
         ###############################################################
 
         for i in range(self.num_layers):
-            batch_ind = torch.tensor(
-                [batch_idx for _ in range(x.length)], device=self.device
-            )
-            x = self.blocks[i](x, atomic_numbers, edge_distance, edge_index, batch_ind)
+            x = self.blocks[i](x, atomic_numbers, edge_distance, edge_index, batch=batch)
 
         # Final layer norm
         x.embedding = self.norm(x.embedding)
@@ -411,7 +409,7 @@ class EquiformerV2_nbody(BaseModel):
         # Position prediction
         ###############################################################
         # Concatenate position and velocity information
-        pos_vel = torch.cat((pos, vel), dim=1)
+        pos_vel = torch.cat((pos, vel), dim=1) # TODO consider using this
 
         # Predict the change in position
         delta_pos = self.force_block(x, atomic_numbers, edge_distance, edge_index)

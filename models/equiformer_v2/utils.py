@@ -35,6 +35,8 @@ from torch_geometric.data import Data
 from torch_geometric.utils import remove_self_loops
 from torch_scatter import scatter, segment_coo, segment_csr
 
+from models.equiformer_v2.architecture.equiformer_v2_nbody import EquiformerV2_nbody
+
 if TYPE_CHECKING:
     from torch.nn.modules.module import _IncompatibleKeys
 
@@ -1073,3 +1075,11 @@ def scatter_det(*args, **kwargs):
         torch.use_deterministic_algorithms(mode=False)
 
     return out
+
+def load_model(model_path, device):
+    print(f'Loading model {model_path} on device {device}')
+
+    model = EquiformerV2_nbody().to(device)
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.eval()
+    return model

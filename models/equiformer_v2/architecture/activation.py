@@ -170,7 +170,7 @@ class S2Activation(torch.nn.Module):
         from_grid_mat = SO3_grid[self.lmax][self.mmax].get_from_grid_mat(
             device=None
         )
-        x_grid = torch.einsum("bai, zic -> zbac", to_grid_mat, inputs)
+        x_grid = torch.einsum("bai, zic -> zbac", to_grid_mat.to(dtype=torch.float32), inputs.to(dtype=torch.float32))
         x_grid = self.act(x_grid)
         outputs = torch.einsum("bai, zbac -> zic", from_grid_mat, x_grid)
         return outputs

@@ -635,6 +635,7 @@ class GravitySim(object):
 
                 update(0)
                 slider.on_changed(update)
+                print('Showing plot, you might need to bring the plot window in focus')
                 plt.show(block=True)
 
             if offline_plot:
