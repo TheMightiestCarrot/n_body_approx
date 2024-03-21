@@ -13,21 +13,37 @@ time_exp_dic = {'time': 0, 'counter': 0}
 
 
 class O3Transform:
-    def __init__(self, lmax_attr):
+    def __init__(self, lmax_attr, use_force=False):
         self.attr_irreps = Irreps.spherical_harmonics(lmax_attr)
+        self.use_force = use_force
 
     def __call__(self, graph):
         pos = graph.pos
         vel = graph.vel
         mass = graph.mass
+        force = graph.force
 
         prod_mass = mass[graph.edge_index[0]] * mass[graph.edge_index[1]]
         rel_pos = pos[graph.edge_index[0]] - pos[graph.edge_index[1]]
         edge_dist = torch.sqrt(rel_pos.pow(2).sum(1, keepdims=True))
 
+        # steerable edge attributes (relative positions in most cases)
+        # but any geometric quantity can be used to steer messages (like relative force or relative velocity)
         graph.edge_attr = spherical_harmonics(self.attr_irreps, rel_pos, normalize=True, normalization='integral')
+        # for example adding additional geometric quantities to steer the messages
+        # rel_vel = vel[graph.edge_index[0]] - vel[graph.edge_index[1]]
+        # rel_force = force[graph.edge_index[0]] - force[graph.edge_index[1]]
+        # graph.edge_attr += spherical_harmonics(self.attr_irreps, rel_vel, normalize=True, normalization='integral')
+        # graph.edge_attr += spherical_harmonics(self.attr_irreps, rel_force, normalize=True, normalization='integral')
+
+        # steerable node attributes
         vel_embedding = spherical_harmonics(self.attr_irreps, vel, normalize=True, normalization='integral')
         graph.node_attr = scatter(graph.edge_attr, graph.edge_index[1], dim=0, reduce="mean") + vel_embedding
+
+        if self.use_force:
+            force_embedding = spherical_harmonics(self.attr_irreps, force, normalize=True,
+                                                  normalization='integral')
+            graph.node_attr += force_embedding
 
         vel_abs = torch.sqrt(vel.pow(2).sum(1, keepdims=True))
         mean_pos = pos.mean(1, keepdims=True)
@@ -121,7 +137,7 @@ def run_epoch(model, optimizer, criterion, epoch, loader, transform, device, arg
 
         if args.model == 'segnn' or args.model == 'seconv':
             graph = Data(pos=loc, vel=vel, force=force, mass=mass, y=y)
-            batch = torch.arange(0, batch_size)
+            batch = torch.arange(0, batch_size).to(device)
             graph.batch = batch.repeat_interleave(n_nodes).long()
             graph.edge_index = knn_graph(loc, args.neighbours, graph.batch)
 

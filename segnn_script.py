@@ -76,7 +76,7 @@ def create_argparser():
                         help='Number of steps to predict')
     parser.add_argument('--random_trajectory_sampling', type=bool, default=True,
                         help='Whether to use any steps in the training data')
-    parser.add_argument('--use_force', type=bool, default=True,
+    parser.add_argument('--use_force', type=bool, default=False,
                         help='Whether to also use ')
 
     # Model parameters

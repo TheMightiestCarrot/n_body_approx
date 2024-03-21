@@ -7,6 +7,7 @@ from .dataset.synthetic_sim import GravitySim
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
 import random
+from functools import partial
 
 
 class GravityDataset():
@@ -195,19 +196,24 @@ class GravityDataset():
         plt.tight_layout()
         plt.show()
 
-    def simulate_one(self, sim):
-        loc, vel, force, mass = self.data
+    def simulate_one(self, sim, loc, vel, mass):
         energies = [self.simulation._energy(loc[sim, i, :, :], vel[sim, i, :, :], mass[i],
                                             self.simulation.interaction_strength) for i in
                     range(loc.shape[1])]
         return energies
 
-    def plot_energy_statistics(self, loc, vel):
+    def get_energies_async(self, loc, vel, mass):
         num_simulations = loc.shape[0]
 
+        partial_simulate_one = partial(self.simulate_one, loc=loc, vel=vel, mass=mass)
+
         with Pool() as pool:
-            energies = pool.map(self.simulate_one, range(0, num_simulations))
-        energies_array = np.array(energies)
+            energies = pool.map(partial_simulate_one, range(0, num_simulations))
+
+        return np.array(energies)
+
+    def plot_energy_statistics(self, loc, vel, force=None, mass=None):
+        energies_array = self.get_energies_async(loc, vel, mass)
 
         plt.figure(figsize=(14, 8))
         colors = {'Kinetic Energy': 'red', 'Potential Energy': 'blue', 'Total Energy': 'green'}
@@ -233,13 +239,8 @@ class GravityDataset():
         plt.tight_layout()
         plt.show()
 
-    def plot_energy_distributions_across_all_sims(self, bins=50):
-        loc, vel, force, mass = self.data
-        num_simulations = loc.shape[0]
-
-        with Pool() as pool:
-            energies = pool.map(self.simulate_one, range(0, num_simulations))
-        energies_array = np.array(energies)
+    def plot_energy_distributions_across_all_sims(self, loc, vel, force=None, mass=None, bins=50):
+        energies_array = self.get_energies_async(loc, vel, mass)
 
         # Flatten the energy arrays to include all time points from all simulations
         kinetic_energies = energies_array[:, :, 0].flatten()
@@ -262,13 +263,9 @@ class GravityDataset():
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.show()
 
-    def plot_energies_of_all_sims(self):
-        loc, vel, force, mass = self.data
+    def plot_energies_of_all_sims(self, loc, vel, force=None, mass=None):
         num_simulations = loc.shape[0]
-
-        with Pool() as pool:
-            energies = pool.map(self.simulate_one, range(0, num_simulations))
-        energies_array = np.array(energies)
+        energies_array = self.get_energies_async(loc, vel, mass)
 
         plt.figure(figsize=(14, 8))
 

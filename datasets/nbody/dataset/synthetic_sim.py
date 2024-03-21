@@ -333,6 +333,74 @@ class GravitySim(object):
         a = np.hstack((ax, ay, az))
         return a
 
+    def simulate_step(self, pos, vel, acc, mass):
+        # (1/2) kick
+        vel += acc * self.dt / 2.0
+
+        # drift
+        pos += vel * self.dt
+
+        # update accelerations
+        acc = self.compute_acceleration(pos, mass, self.interaction_strength, self.softening)
+
+        # (1/2) kick
+        vel += acc * self.dt / 2.0
+
+        return pos, vel, acc
+
+    def sample_trajectory(self, T=10000, sample_freq=10, og_pos_save=None, og_vel_save=None, og_force_save=None):
+        assert (T % sample_freq == 0)
+
+        T_save = int(T / sample_freq)
+
+        N = self.n_balls
+
+        pos_save = np.zeros((T_save, N, self.dim))
+        vel_save = np.zeros((T_save, N, self.dim))
+        force_save = np.zeros((T_save, N, self.dim))
+
+        mass = np.ones((N, 1))
+        if og_pos_save is None:
+            # Specific sim parameters
+            pos = np.random.randn(N, self.dim)  # randomly selected positions and velocities
+            vel = np.random.randn(N, self.dim)
+
+            # Convert to Center-of-Mass frame
+            vel -= np.mean(mass * vel, 0) / np.mean(mass)
+
+        else:
+            pos = np.copy(og_pos_save[-1])
+            vel = np.copy(og_vel_save[-1])
+
+        # calculate initial gravitational accelerations
+        acc = self.compute_acceleration(pos, mass, self.interaction_strength, self.softening)
+
+        if og_pos_save is not None:
+            pos, vel, acc = self.simulate_step(pos, vel, acc, mass)
+
+        counter = 0
+
+        for i in range(T):
+            if i % sample_freq == 0:
+                pos_save[counter] = pos
+                vel_save[counter] = vel
+                force_save[counter] = acc * mass
+                counter += 1
+
+            pos, vel, acc = self.simulate_step(pos, vel, acc, mass)
+
+        # Add noise to observations
+        pos_save += np.random.randn(T_save, N, self.dim) * self.noise_var
+        vel_save += np.random.randn(T_save, N, self.dim) * self.noise_var
+        force_save += np.random.randn(T_save, N, self.dim) * self.noise_var
+
+        if og_pos_save is not None:
+            pos_save = np.concatenate((og_pos_save, pos_save), axis=0)
+            vel_save = np.concatenate((og_vel_save, vel_save), axis=0)
+            force_save = np.concatenate((og_force_save, force_save), axis=0)
+
+        return pos_save, vel_save, force_save, mass
+
     @staticmethod
     def compute_force_batched(pos, mass, G, softening, batch_size):
         num_particles = pos.shape[0]
@@ -499,13 +567,15 @@ class GravitySim(object):
         plt.show()
 
     @staticmethod
-    def interactive_trajectory_plot_all_particles_3d(actual_pos, predicted_pos=None, particle_index=None, boxSize=1,
+    def interactive_trajectory_plot_all_particles_3d(actual_pos=None, predicted_pos=None, particle_index=None,
+                                                     boxSize=1,
                                                      dims=3,
                                                      offline_plot=False, loggers=[],
                                                      video_tag="trajectories all particles 3D", trace_length=10,
                                                      alpha=0.2):
         import matplotlib
         from matplotlib.widgets import Slider
+        from matplotlib.lines import Line2D
         import traceback
         og_backend = matplotlib.get_backend()
         try:
@@ -516,6 +586,11 @@ class GravitySim(object):
                     matplotlib.use('Qt5Agg')
                 except (NameError, KeyError):
                     matplotlib.use('TkAgg')
+
+            if actual_pos is None and predicted_pos is None:
+                raise ValueError("At least one of actual_pos or predicted_pos must be provided.")
+
+            actual_lines, predicted_lines = [], []
 
             skip_steps = 2
             plt.ion()
@@ -533,8 +608,9 @@ class GravitySim(object):
                 '' if particle_index is None else f'with predicted particle {str(particle_index)}'))
 
             plt.subplots_adjust(bottom=0.25)
-            actual_lines = [ax.plot([], [], [], 'b-', label='Actual', alpha=alpha)[0] for _ in
-                            range(actual_pos.shape[1])]
+            if actual_pos is not None:
+                actual_lines = [ax.plot([], [], [], 'b-', label='Actual', alpha=alpha)[0] for _ in
+                                range(actual_pos.shape[1])]
 
             if predicted_pos is not None:
                 if particle_index is None:
@@ -551,15 +627,20 @@ class GravitySim(object):
 
             ax.legend(handles=legend_lines)
 
-            max_actual_index = actual_pos.shape[0] - 1
+            max_actual_index = 0
+            if actual_pos is not None:
+                max_actual_index = actual_pos.shape[0] - 1
             if predicted_pos is not None:
                 max_predicted_steps = predicted_pos.shape[0] - 1
             else:
                 max_predicted_steps = 0
 
             # markers for first position
-            current_actual_markers = [ax.scatter([], [], [], color='blue', marker='o', s=3, depthshade=False) for _ in
-                                      range(actual_pos.shape[1])]
+            current_actual_markers = []
+            if actual_pos is not None:
+                current_actual_markers = [ax.scatter([], [], [], color='blue', marker='o', s=3, depthshade=False) for _
+                                          in
+                                          range(actual_pos.shape[1])]
 
             if predicted_pos is not None:
                 current_predicted_markers = [ax.scatter([], [], [], color='red', marker='o', s=3, depthshade=False) for
@@ -591,15 +672,16 @@ class GravitySim(object):
                 last_actual_step = min(time_step, max_actual_index)
                 last_predicted_step = min(time_step, max_predicted_steps)
 
-                for pi in range(actual_pos.shape[1]):
-                    actual_lines[pi].set_data(actual_pos[start_step:last_actual_step + 1, pi, 0],
-                                              actual_pos[start_step:last_actual_step + 1, pi, 1])
-                    actual_lines[pi].set_3d_properties(actual_pos[start_step:last_actual_step + 1, pi, 2])
+                if actual_pos is not None:
+                    for pi in range(actual_pos.shape[1]):
+                        actual_lines[pi].set_data(actual_pos[start_step:last_actual_step + 1, pi, 0],
+                                                  actual_pos[start_step:last_actual_step + 1, pi, 1])
+                        actual_lines[pi].set_3d_properties(actual_pos[start_step:last_actual_step + 1, pi, 2])
 
-                    # marker
-                    current_actual_markers[pi]._offsets3d = (
-                        actual_pos[last_actual_step, pi, 0:1], actual_pos[last_actual_step, pi, 1:2],
-                        actual_pos[last_actual_step, pi, 2:3])
+                        # marker
+                        current_actual_markers[pi]._offsets3d = (
+                            actual_pos[last_actual_step, pi, 0:1], actual_pos[last_actual_step, pi, 1:2],
+                            actual_pos[last_actual_step, pi, 2:3])
 
                 # Update predicted particle(s)
                 if predicted_pos is not None:
@@ -609,9 +691,6 @@ class GravitySim(object):
                                                 predicted_pos[start_step:last_predicted_step + 1, particle_index, 1])
                         predicted_line.set_3d_properties(
                             predicted_pos[start_step:last_predicted_step + 1, particle_index, 2])
-                        current_actual_markers[pi]._offsets3d = (
-                        actual_pos[last_actual_step, pi, 0:1], actual_pos[last_actual_step, pi, 1:2],
-                        actual_pos[last_actual_step, pi, 2:3])
 
                     else:
                         # Adjust each predicted particle to plot up to the last predicted step
@@ -621,8 +700,9 @@ class GravitySim(object):
                             predicted_lines[pi].set_3d_properties(
                                 predicted_pos[start_step:last_predicted_step + 1, pi, 2])
                             current_predicted_markers[pi]._offsets3d = (
-                            predicted_pos[last_predicted_step, pi, 0:1], predicted_pos[last_predicted_step, pi, 1:2],
-                            predicted_pos[last_predicted_step, pi, 2:3])
+                                predicted_pos[last_predicted_step, pi, 0:1],
+                                predicted_pos[last_predicted_step, pi, 1:2],
+                                predicted_pos[last_predicted_step, pi, 2:3])
 
                 if offline_plot:
                     return actual_lines + (
@@ -654,74 +734,6 @@ class GravitySim(object):
 
         except KeyboardInterrupt:
             pass
-
-    def simulate_step(self, pos, vel, acc, mass):
-        # (1/2) kick
-        vel += acc * self.dt / 2.0
-
-        # drift
-        pos += vel * self.dt
-
-        # update accelerations
-        acc = self.compute_acceleration(pos, mass, self.interaction_strength, self.softening)
-
-        # (1/2) kick
-        vel += acc * self.dt / 2.0
-
-        return pos, vel, acc
-
-    def sample_trajectory(self, T=10000, sample_freq=10, og_pos_save=None, og_vel_save=None, og_force_save=None):
-        assert (T % sample_freq == 0)
-
-        T_save = int(T / sample_freq)
-
-        N = self.n_balls
-
-        pos_save = np.zeros((T_save, N, self.dim))
-        vel_save = np.zeros((T_save, N, self.dim))
-        force_save = np.zeros((T_save, N, self.dim))
-
-        mass = np.ones((N, 1))
-        if og_pos_save is None:
-            # Specific sim parameters
-            pos = np.random.randn(N, self.dim)  # randomly selected positions and velocities
-            vel = np.random.randn(N, self.dim)
-
-            # Convert to Center-of-Mass frame
-            vel -= np.mean(mass * vel, 0) / np.mean(mass)
-
-        else:
-            pos = np.copy(og_pos_save[-1])
-            vel = np.copy(og_vel_save[-1])
-
-        # calculate initial gravitational accelerations
-        acc = self.compute_acceleration(pos, mass, self.interaction_strength, self.softening)
-
-        if og_pos_save is not None:
-            pos, vel, acc = self.simulate_step(pos, vel, acc, mass)
-
-        counter = 0
-
-        for i in range(T):
-            if i % sample_freq == 0:
-                pos_save[counter] = pos
-                vel_save[counter] = vel
-                force_save[counter] = acc * mass
-                counter += 1
-
-            pos, vel, acc = self.simulate_step(pos, vel, acc, mass)
-
-        # Add noise to observations
-        pos_save += np.random.randn(T_save, N, self.dim) * self.noise_var
-        vel_save += np.random.randn(T_save, N, self.dim) * self.noise_var
-        force_save += np.random.randn(T_save, N, self.dim) * self.noise_var
-
-        if og_pos_save is not None:
-            pos_save = np.concatenate((og_pos_save, pos_save), axis=0)
-            vel_save = np.concatenate((og_vel_save, vel_save), axis=0)
-            force_save = np.concatenate((og_force_save, force_save), axis=0)
-
-        return pos_save, vel_save, force_save, mass
 
 
 if __name__ == '__main__':

@@ -1,4 +1,11 @@
 import argparse
+import copy
+import numpy as np
+import torch
+from sklearn.metrics import mean_squared_error
+from torch_geometric.data import Data
+from torch_geometric.nn import knn_graph
+from datasets.nbody.train_gravity_V2 import O3Transform
 
 
 def create_argparser():
@@ -101,25 +108,14 @@ def self_feed_stepwise_prediction(model, data, simulation_instance, args, device
         - Tuple of numpy arrays: (simulated stepwise positions, model predictions), with shapes
           [(num_simulations, steps, num_nodes, output_dims), (num_simulations, steps, num_nodes, prediction_dims)].
         """
-    import torch
-    import copy
-    from torch_geometric.data import Data
-    from torch_geometric.nn import knn_graph
-    from datasets.nbody.train_gravity import O3Transform
-    import numpy as np
 
-    import importlib
-    import datasets.nbody.dataset.synthetic_sim as synthetic_sim
+    use_force = args.use_force
+    transform = O3Transform(args.lmax_attr, use_force)
 
-    importlib.reload(synthetic_sim)
-
-    transform = O3Transform(args.lmax_attr)
-
-    simulations = []
-    all_predictions = []
+    all_states = []
 
     for simulation_index in simulation_indices:
-        print("Simulating", simulation_index)
+        print("Simulating", simulation_index, "Using force:", use_force)
         loc, vel, force, mass = copy.deepcopy(data)
 
         n_nodes = loc.shape[-2]
@@ -134,8 +130,7 @@ def self_feed_stepwise_prediction(model, data, simulation_instance, args, device
 
         output_dims = loc.shape[-1]
 
-        stepwise_prediction = []
-        predictions = []
+        states = []
         for step in range(steps):
             graph = Data(pos=loc, vel=vel, force=force, mass=mass)
             graph.edge_index = knn_graph(loc, args.neighbours)
@@ -157,35 +152,20 @@ def self_feed_stepwise_prediction(model, data, simulation_instance, args, device
             force = simulation_instance.compute_force_batched(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
                                                               simulation_instance.interaction_strength,
                                                               simulation_instance.softening, 9999999)
-
+            # todo kontrola spravnosti vypoctu!!
             force = torch.from_numpy(force)
-            # force = force_copy[simulation_index, step]
 
-            stepwise_prediction.append(loc.clone())
-            predictions.append(prediction.copy())
+            states.append((loc.clone(), vel.clone(), force.clone()))
 
-        stepwise_prediction = np.stack(stepwise_prediction)
-        simulations.append(stepwise_prediction)
-        all_predictions.append(predictions)
+        all_states.append(np.stack(states))
+    all_states = np.stack(all_states)
 
-    return np.stack(simulations), np.stack(all_predictions)
+    return all_states[:, :, 0, ...], all_states[:, :, 1, ...], all_states[:, :, 2, ...]
 
 
 def self_feed_batch_prediction(model, data, simulation_instance, args, device,
                                n_sims=10, steps=6):
-    import torch
-    import copy
-    from torch_geometric.data import Data
-    from torch_geometric.nn import knn_graph
-    from datasets.nbody.train_gravity import O3Transform
-    import numpy as np
-
-    import importlib
-    import datasets.nbody.dataset.synthetic_sim as synthetic_sim
-
-    importlib.reload(synthetic_sim)
-
-    transform = O3Transform(args.lmax_attr)
+    transform = O3Transform(args.lmax_attr, args.use_force)
 
     loc, vel, force, mass = copy.deepcopy(data)
 
@@ -246,13 +226,6 @@ def self_feed_batch_prediction(model, data, simulation_instance, args, device,
 
 
 def batch_prediction(model, data, args, device, simulation_indices=(i for i in range(10))):
-    import copy
-    from torch_geometric.data import Data
-    from torch_geometric.nn import knn_graph
-    from datasets.nbody.train_gravity import O3Transform
-    import torch
-    import numpy as np
-
     transform = O3Transform(args.lmax_attr)
 
     all_predictions = []
@@ -285,8 +258,6 @@ def batch_prediction(model, data, args, device, simulation_indices=(i for i in r
 
 
 def get_targets(data, simulation_index, t_delta):
-    import numpy as np
-    import copy
     loc, vel, force, mass = copy.deepcopy(data)
 
     steps = loc.shape[1]
@@ -299,7 +270,6 @@ def get_targets(data, simulation_index, t_delta):
 
 
 def compare_predictions(batch_preds_np, stepwise_preds_np):
-    from sklearn.metrics import mean_squared_error
     # Calculate MSE
     mse_batch = mean_squared_error(batch_preds_np.reshape(-1, 3), stepwise_preds_np.reshape(-1, 3))
     mse_stepwise = mean_squared_error(stepwise_preds_np.reshape(-1, 3), batch_preds_np.reshape(-1, 3))
