@@ -1,4 +1,5 @@
-import sys
+import glob
+import os
 
 import torch
 from torch_geometric.data import Data
@@ -14,20 +15,22 @@ def main():
     parser.add_argument(
         "--model-path",
         type=str,
+        default=max(
+            filter(os.path.isfile, glob.glob("models/equiformer_v2/runs/*/*")),
+            key=os.path.getmtime,
+        ),
         help="Path to the model",
     )
     parser.add_argument(
-        "--num-steps", type=int, default=30, help="Number of steps to predict"
+        "--num-steps", type=int, default=20, help="Number of steps to predict"
     )
     args = parser.parse_args()
 
     torch.manual_seed(42)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Inferring on {device}")
 
-    model_path = args.model_path
-    model = load_model(model_path, device)
+    model = load_model(args.model_path, device)
 
     dataset_train = GravityDataset(
         partition="test",
@@ -57,7 +60,9 @@ def main():
     predicted_force = [force_initial]
     predicted_mass = [mass_initial]
 
-    for _ in range(num_steps - 1):
+    for step in range(num_steps - 1):
+        print(f"Predicting step {step}")
+
         data = [
             predicted_loc[-1],
             predicted_vel[-1],
@@ -83,6 +88,8 @@ def main():
             torch.zeros_like(pred)
         )  # Assuming force is not predicted
         predicted_mass.append(predicted_mass[-1])  # Assuming mass remains constant
+
+    print("Finished prediction")
 
     predicted_loc = torch.cat(predicted_loc, dim=0)
     predicted_vel = torch.cat(predicted_vel, dim=0)
