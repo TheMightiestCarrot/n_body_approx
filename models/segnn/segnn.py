@@ -24,6 +24,7 @@ class SEGNN(nn.Module):
             pool="avg",
             task="graph",
             additional_message_irreps=None,
+            training_args=None
     ):
         super().__init__()
         self.task = task
@@ -38,6 +39,8 @@ class SEGNN(nn.Module):
         self.embedding_layer = O3TensorProduct(
             input_irreps, hidden_irreps, node_attr_irreps
         )
+
+        self.training_args = training_args
 
         # Message passing layers.
         layers = []

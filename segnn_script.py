@@ -72,13 +72,12 @@ def create_argparser():
     # Gravity parameters:
     parser.add_argument('--neighbours', type=int, default=6,
                         help='Number of connected nearest neighbours')
-
-    # Gravity parameters:
     parser.add_argument('--steps_to_predict', type=int, default=2,
                         help='Number of steps to predict')
-
     parser.add_argument('--random_trajectory_sampling', type=bool, default=True,
                         help='Whether to use any steps in the training data')
+    parser.add_argument('--use_force', type=bool, default=True,
+                        help='Whether to also use ')
 
     # Model parameters
     parser.add_argument('--model', type=str, default="segnn",
@@ -188,7 +187,8 @@ if __name__ == "__main__":
                       norm=args.norm,
                       pool=args.pool,
                       task=task,
-                      additional_message_irreps=additional_message_irreps)
+                      additional_message_irreps=additional_message_irreps,
+                      training_args=args)
         args.ID = "_".join([args.model, args.dataset, args.target, str(np.random.randint(1e4, 1e5))])
     elif args.model == "seconv":
         from models.segnn.seconv import SEConv
@@ -237,4 +237,7 @@ if __name__ == "__main__":
     loggers_list = [loggers.TensorBoardLogger(writer)]
     for logger in loggers_list:
         torch.save(model, os.path.join(logger.get_logdir(), "model.pth"))
+        import json
 
+        with open(os.path.join(logger.get_logdir(), 'training_args.json'), 'w') as f:
+            json.dump({"args": vars(args)}, f, indent=4)

@@ -18,7 +18,7 @@ class GravityDataset():
     os.makedirs(path, exist_ok=True)
 
     def __init__(self, partition='train', max_samples=1e8, dataset_name="nbody_small", bodies=5, neighbours=6,
-                 target="pos", random_trajectory_sampling=False, steps_to_predict=2):
+                 target="pos", random_trajectory_sampling=False, steps_to_predict=2, path=None):
         self.partition = partition
         if self.partition == 'val':
             self.suffix = 'valid'
@@ -36,7 +36,7 @@ class GravityDataset():
         self.simulation: GravitySim = None
         self.max_samples = int(max_samples)
         self.dataset_name = dataset_name
-        self.data, self.edges = self.load()
+        self.data, self.edges = self.load(path)
         self.neighbours = int(neighbours)
         self.target = target
         self.random_trajectory_sampling = random_trajectory_sampling

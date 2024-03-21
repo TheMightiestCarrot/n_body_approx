@@ -13,8 +13,9 @@ time_exp_dic = {'time': 0, 'counter': 0}
 
 
 class O3Transform:
-    def __init__(self, lmax_attr):
+    def __init__(self, lmax_attr, use_force=False):
         self.attr_irreps = Irreps.spherical_harmonics(lmax_attr)
+        self.use_force = use_force
 
     def __call__(self, graph):
         pos = graph.pos
@@ -28,6 +29,11 @@ class O3Transform:
         graph.edge_attr = spherical_harmonics(self.attr_irreps, rel_pos, normalize=True, normalization='integral')
         vel_embedding = spherical_harmonics(self.attr_irreps, vel, normalize=True, normalization='integral')
         graph.node_attr = scatter(graph.edge_attr, graph.edge_index[1], dim=0, reduce="mean") + vel_embedding
+
+        if self.use_force:
+            force_embedding = spherical_harmonics(self.attr_irreps, graph.force, normalize=True,
+                                                  normalization='integral')
+            graph.node_attr += force_embedding
 
         vel_abs = torch.sqrt(vel.pow(2).sum(1, keepdims=True))
         mean_pos = pos.mean(1, keepdims=True)
@@ -59,7 +65,7 @@ def train(gpu, model, args):
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     loss_mse = nn.MSELoss()
-    transform = O3Transform(args.lmax_attr)
+    transform = O3Transform(args.lmax_attr, args.use_force)
 
     if args.log and gpu == 0:
         if args.time_exp:
