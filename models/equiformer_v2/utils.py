@@ -1077,7 +1077,9 @@ def scatter_det(*args, **kwargs):
     return out
 
 def load_model(model_path, device):
+    print(f'Loading model {model_path} on device {device}')
+
     model = EquiformerV2_nbody().to(device)
-    model.load_state_dict(torch.load(f'{model_path}/nbody_small_best_model.pth', map_location=device))
+    model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
     return model
