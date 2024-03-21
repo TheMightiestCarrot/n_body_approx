@@ -14,16 +14,16 @@ def compute_neighbors(data, edge_index, batch_size, num_atoms):
     natoms = (
         data.natoms
         if "natoms" in data
-        else torch.tensor([[num_atoms]] * batch_size, device=data[0].device))
+        else torch.tensor([num_atoms / batch_size] * batch_size, device=data[0].device).reshape(-1))
     num_neighbors = segment_coo(
-        ones, edge_index[1], dim_size=natoms.sum() if "natoms" in data else batch_size * num_atoms
+        ones, edge_index[1], dim_size=natoms.sum()
     )
 
     # Get number of neighbors per image
     image_indptr = torch.zeros(
         natoms.shape[0] + 1, device=data[0].device, dtype=torch.long
     )
-    image_indptr[1:] = torch.cumsum(natoms.squeeze(), dim=0)
+    image_indptr[1:] = torch.cumsum(natoms, dim=0)
     neighbors = segment_csr(num_neighbors, image_indptr)
     return neighbors
 
