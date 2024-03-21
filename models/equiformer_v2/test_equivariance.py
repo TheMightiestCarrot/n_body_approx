@@ -26,7 +26,7 @@ def test_equivariance():
         partition="test",
         max_samples=1,
         target="pos",
-        path="models/equiformer_v2/runs/2024-03-20_17-08-30/nbody_small_dataset",
+        path=os.path.join(os.path.dirname(model_path), "nbody_small_dataset")
     )
     loc, vel, force, mass = dataset.data
     output_dims = loc.shape[-1]

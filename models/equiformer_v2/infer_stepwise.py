@@ -29,7 +29,7 @@ def main():
         max_samples=max_samples,
         neighbours=args.neighbours,
         target=args.target,
-        path=f"{args.model_path}/nbody_small_dataset",
+        path=os.path.join(os.path.dirname(args.model_path), "nbody_small_dataset")
     )
 
     simulation_index = 0

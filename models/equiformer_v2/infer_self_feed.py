@@ -38,7 +38,7 @@ def main():
         max_samples=1,
         neighbours=args.neighbours,
         target=args.target,
-        path="models/equiformer_v2/runs/2024-03-20_17-08-30/nbody_small_dataset",
+        path=os.path.join(os.path.dirname(args.model_path), "nbody_small_dataset"),
     )
 
     simulation_index = 0
