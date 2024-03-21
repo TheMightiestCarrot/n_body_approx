@@ -33,6 +33,15 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {
+            "name": "Python infer_stepwise",
+            "type": "python",
+            "request": "launch",
+            "module": "models.equiformer_v2.infer_stepwise",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }
