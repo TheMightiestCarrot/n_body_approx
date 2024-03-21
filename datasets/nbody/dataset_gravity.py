@@ -14,11 +14,13 @@ class GravityDataset():
     NBodyDataset
 
     """
-    path = os.path.join(pathlib.Path(__file__).parent.absolute(), 'dataset', 'gravity')
-    os.makedirs(path, exist_ok=True)
+
+    GROUND_TRUTH_FILE_PREFIXES = ['loc', 'vel', 'forces', 'masses']
+
+    
 
     def __init__(self, partition='train', max_samples=1e8, dataset_name="nbody_small", bodies=5, neighbours=6,
-                 target="pos", random_trajectory_sampling=False, steps_to_predict=2, path=None):
+                 target="pos", random_trajectory_sampling=False, steps_to_predict=2, path=os.path.join(pathlib.Path(__file__).parent.absolute(), 'dataset', 'gravity')):
         self.partition = partition
         if self.partition == 'val':
             self.suffix = 'valid'
@@ -36,6 +38,9 @@ class GravityDataset():
         self.simulation: GravitySim = None
         self.max_samples = int(max_samples)
         self.dataset_name = dataset_name
+        self.path = path
+
+        os.makedirs(path, exist_ok=True)
         self.data, self.edges = self.load(path)
         self.neighbours = int(neighbours)
         self.target = target
@@ -47,10 +52,7 @@ class GravityDataset():
         if path is None:
             path = self.path
 
-        loc = np.load(os.path.join(path, 'loc_' + self.suffix + '.npy'))
-        vel = np.load(os.path.join(path, 'vel_' + self.suffix + '.npy'))
-        force = np.load(os.path.join(path, 'forces_' + self.suffix + '.npy'))
-        mass = np.load(os.path.join(path, 'masses_' + self.suffix + '.npy'))
+        loc, vel, force, mass = [np.load(os.path.join(path, f"{prefix}_{self.suffix}.npy")) for prefix in self.GROUND_TRUTH_FILE_PREFIXES]
 
         self.num_nodes = loc.shape[-1]
 
