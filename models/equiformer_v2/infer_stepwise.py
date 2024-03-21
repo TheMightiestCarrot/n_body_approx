@@ -1,3 +1,5 @@
+import glob
+import os
 import torch
 
 from datasets.nbody.dataset_gravity import GravityDataset
@@ -10,8 +12,18 @@ def main():
     parser.add_argument(
         "--batched", action="store_true", help="inferring in batched mode"
     )
-    parser.add_argument("--model-path", type=str, help="path to the model")
-    parser.add_argument("--num-steps", type=int, default=20, help="number of steps for inference")
+    parser.add_argument(
+        "--model-path",
+        type=str,
+        default=max(
+            filter(os.path.isfile, glob.glob("models/equiformer_v2/runs/*/*")),
+            key=os.path.getmtime,
+        ),
+        help="path to the model",
+    )
+    parser.add_argument(
+        "--num-steps", type=int, default=20, help="number of steps for inference"
+    )
     args = parser.parse_args()
 
     torch.manual_seed(42)
@@ -33,7 +45,7 @@ def main():
     )
 
     simulation_index = 0
-    
+
     num_steps = args.num_steps
 
     loc, vel, force, mass = dataset_train.data
