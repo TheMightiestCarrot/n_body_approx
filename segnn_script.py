@@ -237,6 +237,8 @@ if __name__ == "__main__":
     loggers_list = [loggers.TensorBoardLogger(writer)]
     for logger in loggers_list:
         torch.save(model, os.path.join(logger.get_logdir(), "model.pth"))
+        # also save state dict
+        torch.save(model.state_dict(), os.path.join(logger.get_logdir(), "model_state_dict.pth"))
         import json
 
         with open(os.path.join(logger.get_logdir(), 'training_args.json'), 'w') as f:
