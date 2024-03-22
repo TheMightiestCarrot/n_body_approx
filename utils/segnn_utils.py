@@ -6,6 +6,7 @@ from sklearn.metrics import mean_squared_error
 from torch_geometric.data import Data
 from torch_geometric.nn import knn_graph
 from datasets.nbody.train_gravity_V2 import O3Transform
+import multiprocessing
 
 
 def create_argparser():
@@ -88,6 +89,58 @@ def create_argparser():
     return parser
 
 
+def simulate_one_index(args_tuple):
+    model, data, simulation_instance, args, device, simulation_index, steps, use_force, transform = args_tuple
+    print("Simulating", simulation_index, "Using force:", use_force)
+    loc, vel, force, mass = copy.deepcopy(data)
+
+    n_nodes = loc.shape[-2]
+    loc, vel, force, mass = [torch.from_numpy(d) for d in [loc, vel, force, mass]]
+    loc, vel, force, mass = [d[simulation_index, 0, ...].to(device) for d in [loc, vel, force, mass]]
+    mass = mass.repeat(n_nodes, 1)
+
+    output_dims = loc.shape[-1]
+    states = []
+
+    for step in range(steps):
+        graph = Data(pos=loc, vel=vel, force=force, mass=mass)
+        graph.edge_index = knn_graph(loc, args.neighbours)
+        graph = transform(graph)  # Add O3 attributes
+        graph = graph.to(device)
+
+        # Model prediction
+        prediction = model(graph).cpu().detach().numpy()
+        delta_loc, delta_vel = prediction[:, :output_dims], prediction[:, output_dims:]
+        loc = loc + torch.from_numpy(delta_loc).to(device)
+        vel = vel + torch.from_numpy(delta_vel).to(device)
+
+        # Update force
+        force = simulation_instance.compute_force(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
+                                                  simulation_instance.interaction_strength,
+                                                  simulation_instance.softening)
+        force = torch.from_numpy(force).to(device)
+
+        states.append((loc.clone(), vel.clone(), force.clone()))
+
+    return np.stack(states)
+
+
+def self_feed_stepwise_prediction_parallel(model, data, simulation_instance, args, device, simulation_indices=range(10),
+                                           steps=6):
+    use_force = args.use_force
+    transform = O3Transform(args.lmax_attr, use_force)
+
+    args_list = [(model, data, simulation_instance, args, device, simulation_index, steps, use_force, transform)
+                 for simulation_index in simulation_indices]
+
+    with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+        all_states = pool.map(simulate_one_index, args_list)
+
+    all_states = np.array(all_states)
+
+    return all_states[:, :, 0, ...], all_states[:, :, 1, ...], all_states[:, :, 2, ...]
+
+
 def self_feed_stepwise_prediction(model, data, simulation_instance, args, device,
                                   simulation_indices=(i for i in range(10)),
                                   steps=6):
@@ -148,11 +201,9 @@ def self_feed_stepwise_prediction(model, data, simulation_instance, args, device
             loc = loc + torch.from_numpy(delta_loc).to(device)
             vel = vel + torch.from_numpy(delta_vel).to(device)
 
-            # todo batchsize
-            force = simulation_instance.compute_force_batched(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
-                                                              simulation_instance.interaction_strength,
-                                                              simulation_instance.softening, 9999999)
-            # todo kontrola spravnosti vypoctu!!
+            force = simulation_instance.compute_force(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
+                                                      simulation_instance.interaction_strength,
+                                                      simulation_instance.softening)
             force = torch.from_numpy(force)
 
             states.append((loc.clone(), vel.clone(), force.clone()))
@@ -185,9 +236,9 @@ def self_feed_batch_prediction(model, data, simulation_instance, args, device,
     states = []
 
     for step in range(steps):
-        batch = torch.arange(0, n_sims)
         graph = Data(pos=loc, vel=vel, force=force, mass=mass)
 
+        batch = torch.arange(0, n_sims)
         graph.batch = batch.repeat_interleave(n_nodes).long()
         graph.edge_index = knn_graph(loc, args.neighbours, graph.batch)
         graph = transform(graph)  # Add O3 attributes
@@ -203,9 +254,9 @@ def self_feed_batch_prediction(model, data, simulation_instance, args, device,
         loc = loc + torch.from_numpy(delta_loc).to(device)
         vel = vel + torch.from_numpy(delta_vel).to(device)
 
-        force = simulation_instance.compute_force_batched(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
-                                                          simulation_instance.interaction_strength,
-                                                          simulation_instance.softening, n_sims)
+        force = simulation_instance.compute_force(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
+                                                  simulation_instance.interaction_strength,
+                                                  simulation_instance.softening, n_sims)
 
         force = torch.from_numpy(force)
         # force = force_copy[simulation_index, step]
@@ -265,13 +316,45 @@ def get_targets(data, simulation_index, t_delta):
     return np.array(targets)
 
 
-def compare_predictions(batch_preds_np, stepwise_preds_np):
-    # Calculate MSE
-    mse_batch = mean_squared_error(batch_preds_np.reshape(-1, 3), stepwise_preds_np.reshape(-1, 3))
-    mse_stepwise = mean_squared_error(stepwise_preds_np.reshape(-1, 3), batch_preds_np.reshape(-1, 3))
+def compare_batch_vs_step(model, dataset, device, args, num_simulations=5):
+    torch.manual_seed(42)
+    np.random.seed(42)
 
-    print({
-        "MSE_Batch": mse_batch,
-        "MSE_Stepwise": mse_stepwise,
-        "MSE_Difference": abs(mse_batch - mse_stepwise)
-    })
+    use_force = args.use_force
+    transform = O3Transform(args.lmax_attr, use_force)
+
+    all_simulations_predictions = batch_prediction(model, dataset.data, args, device,
+                                                   simulation_indices=(i for i in range(num_simulations)))
+
+    all_stepwise_simulations_predictions = []  # List to store predictions for all simulations
+
+    for simulation_index in range(num_simulations):
+        loc, vel, force, mass = copy.deepcopy(dataset.data)
+
+        output_dims = loc.shape[-1]
+        n_nodes = loc.shape[-2]
+        simulation_steps = len(loc[simulation_index])  # Adjust based on your simulation steps determination logic
+
+        stepwise_prediction = []  # List to store predictions for each step in the current simulation
+        for step in range(simulation_steps):
+            loc_step = torch.from_numpy(loc[simulation_index][step]).view(-1, output_dims).to(device)
+            vel_step = torch.from_numpy(vel[simulation_index][step]).view(-1, output_dims).to(device)
+            force_step = torch.from_numpy(force[simulation_index][step]).view(-1, output_dims).to(device)
+            mass_step = torch.tensor(mass[simulation_index], dtype=torch.float).repeat(n_nodes, 1).to(device)
+
+            graph = Data(pos=loc_step, vel=vel_step, force=force_step, mass=mass_step)
+            graph.edge_index = knn_graph(loc_step, args.neighbours)
+
+            graph = transform(graph)  # Add O3 attributes
+            graph = graph.to(device)
+            stepwise_prediction.append(model(graph).detach().cpu().numpy())
+
+        # Convert stepwise predictions to a single array for the current simulation
+        stepwise_prediction = np.stack(stepwise_prediction)
+        all_stepwise_simulations_predictions.append(stepwise_prediction)
+
+    # Convert all simulations' predictions into a NumPy array with an extra dimension for simulations
+    all_stepwise_simulations_predictions = np.array(all_stepwise_simulations_predictions)
+
+    print("Difference:", np.abs(all_stepwise_simulations_predictions - all_simulations_predictions).mean())
+    return all_simulations_predictions, all_stepwise_simulations_predictions
