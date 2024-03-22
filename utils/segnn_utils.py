@@ -149,9 +149,9 @@ def self_feed_stepwise_prediction(model, data, simulation_instance, args, device
             vel = vel + torch.from_numpy(delta_vel).to(device)
 
             # todo batchsize
-            force = simulation_instance.compute_force_batched(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
+            force = simulation_instance.compute_force(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
                                                               simulation_instance.interaction_strength,
-                                                              simulation_instance.softening, 9999999)
+                                                              simulation_instance.softening)
             # todo kontrola spravnosti vypoctu!!
             force = torch.from_numpy(force)
 
@@ -203,7 +203,7 @@ def self_feed_batch_prediction(model, data, simulation_instance, args, device,
         loc = loc + torch.from_numpy(delta_loc).to(device)
         vel = vel + torch.from_numpy(delta_vel).to(device)
 
-        force = simulation_instance.compute_force_batched(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
+        force = simulation_instance.compute_force(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
                                                           simulation_instance.interaction_strength,
                                                           simulation_instance.softening, n_sims)
 
