@@ -1,6 +1,5 @@
 import argparse
 import datetime
-import json
 import os
 import shutil
 import time
@@ -12,7 +11,8 @@ from timm.utils import ModelEmaV2, dispatch_clip_grad
 
 import wandb
 from datasets.nbody.dataset_gravity import GravityDataset
-from models.equiformer_v2.architecture.equiformer_v2_nbody import EquiformerV2_nbody
+from models.equiformer_v2.architecture.equiformer_v2_nbody import \
+    EquiformerV2_nbody
 
 ModelEma = ModelEmaV2
 
@@ -180,8 +180,9 @@ def main(args):
             wandb.log({"Train loss": train_loss})
         if epoch % args.test_interval == 0 or epoch == args.epochs - 1:
             print(f"Starting validation epoch {epoch}")
-            _, val_loss = train_one_epoch(
-                model,
+            with torch.no_grad():
+                _, val_loss = train_one_epoch(
+                    model,
                 criterion,
                 loader_val,
                 optimizer,
@@ -190,14 +191,14 @@ def main(args):
                 backprop=False,
                 args=args,
             )
-            wandb.log({"Val loss": val_loss})
+                wandb.log({"Val loss": val_loss})
 
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                best_epoch = epoch
-            print(
-                "*** Best Val Loss: %.5f \t Best epoch %d" % (best_val_loss, best_epoch)
-            )
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    best_epoch = epoch
+                print(
+                    "*** Best Val Loss: %.5f \t Best epoch %d" % (best_val_loss, best_epoch)
+                )
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     save_dir_path = f"models/equiformer_v2/runs/{current_time}"

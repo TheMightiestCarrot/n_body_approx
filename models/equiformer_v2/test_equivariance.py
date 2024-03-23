@@ -107,4 +107,5 @@ def test_equivariance():
 
 
 if __name__ == "__main__":
-    test_equivariance()
+    with torch.no_grad():
+        test_equivariance()

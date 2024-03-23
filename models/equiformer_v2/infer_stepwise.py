@@ -77,7 +77,7 @@ def main():
         predicted_loc = []
         for step in range(num_steps):
             step_data = [
-                d[step * n_nodes : (step + 1) * n_nodes].to(device=device) for d in data
+                d[step * n_nodes : (step + 1) * n_nodes] for d in data
             ]
             batch_size = 1
             batch = (
@@ -87,13 +87,13 @@ def main():
                 .to(device=device)
             )
             step_pred = model(step_data, batch)
-            predicted_loc.append(step_pred)
+            predicted_loc.append(step_pred.cpu())
         pred = torch.cat(predicted_loc, dim=0)
 
     from datasets.nbody.dataset import synthetic_sim
 
-    loc = loc.view(num_steps, n_nodes, output_dims).detach().numpy()
-    pred = pred.view(num_steps, n_nodes, output_dims).detach().numpy()
+    loc = loc.view(num_steps, n_nodes, output_dims).numpy()
+    pred = pred.view(num_steps, n_nodes, output_dims).numpy()
 
     sim = synthetic_sim.GravitySim(n_balls=5, loc_std=1)
     sim.interactive_trajectory_plot_all_particles_3d(
@@ -102,4 +102,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with torch.no_grad():
+        main()
