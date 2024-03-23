@@ -106,7 +106,7 @@ def train_one_epoch(
         if batch_idx % print_freq == 0 or batch_idx == len(data_loader) - 1:
             w = time.perf_counter() - start_time
             e = (batch_idx + 1) / len(data_loader)
-            info_str = f"Epoch: [{epoch}/{args.epochs}] \t Step: [{batch_idx}/{len(data_loader)}] \t Loss: {loss_metric.compute().item():.5f}, MAE: {mae_metric.compute().item():.5f}, time/step={(1e3 * w / e / len(data_loader)):.0f}ms"
+            info_str = f"Epoch: [{epoch + 1}/{args.epochs}] \t Step: [{batch_idx + 1}/{len(data_loader)}] \t Loss: {loss_metric.compute().item():.5f}, MAE: {mae_metric.compute().item():.5f}, time/step={(1e3 * w / e / len(data_loader)):.0f}ms"
             info_str += f', lr={optimizer.param_groups[0]["lr"]:.2e}'
             print(info_str)
 
