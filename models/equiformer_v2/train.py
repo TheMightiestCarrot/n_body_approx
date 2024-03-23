@@ -214,6 +214,9 @@ def main(args):
             dataset_test.path, f"{prefix}_{dataset_test.suffix}.npy"
         )
         shutil.copy(src_file, dataset_save_path)
+    # also copy the metadata.json file
+    src_file = os.path.join(dataset_test.path, "metadata.json")
+    shutil.copy(src_file, dataset_save_path)
 
     return best_val_loss, best_epoch
 
