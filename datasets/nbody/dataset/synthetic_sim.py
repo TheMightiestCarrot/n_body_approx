@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import time
@@ -508,6 +509,11 @@ class GravitySim(object):
         from matplotlib.widgets import Slider
         import traceback
         og_backend = matplotlib.get_backend()
+        # if we're running in headless mode, offline_plot should be True
+        if os.environ.get('DISPLAY', '') == '':
+            print('running in headless mode, setting offline_plot to True')
+            offline_plot = True
+
         try:
             if offline_plot:
                 matplotlib.use('Agg')
@@ -640,17 +646,23 @@ class GravitySim(object):
 
             if offline_plot:
                 import tempfile
-                with tempfile.NamedTemporaryFile(delete=True, suffix='.mp4') as temp:
-                    from matplotlib.animation import FuncAnimation
-                    fps = 20
-                    frames = actual_pos.shape[0] // skip_steps
-                    anim = FuncAnimation(fig, update, frames=frames, blit=False)
-                    filename = temp.name
+                from matplotlib.animation import FuncAnimation
+                fps = 20
+                frames = actual_pos.shape[0] // skip_steps
+                anim = FuncAnimation(fig, update, frames=frames, blit=False)
+                
+                if loggers:
+                    with tempfile.NamedTemporaryFile(delete=True, suffix='.mp4') as temp:
+                        filename = temp.name
+                        anim.save(filename, fps=fps,
+                                  extra_args=['-vcodec', 'libx264', '-preset', 'fast', '-crf', '22'])
+
+                        for logger in loggers:
+                            logger.log_video(f"{video_tag}", filename, fps=fps)
+                else:
+                    filename = f"{video_tag}.mp4"
                     anim.save(filename, fps=fps,
                               extra_args=['-vcodec', 'libx264', '-preset', 'fast', '-crf', '22'])
-
-                    for i, logger in enumerate(loggers):
-                        logger.log_video(f"{video_tag}", filename, fps=fps)
 
         except KeyboardInterrupt:
             pass
