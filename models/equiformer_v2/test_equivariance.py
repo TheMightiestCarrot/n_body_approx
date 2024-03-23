@@ -29,12 +29,16 @@ def test_equivariance():
         partition="test",
         max_samples=1,
         target="pos",
-        path=os.path.join(os.path.dirname(model_path), "nbody_small_dataset"),
+        path=os.path.join(
+            os.path.dirname(model_path), "nbody_small_dataset"
+        ),  # TODO: use random numbers instead of dataset samples
     )
     loc, vel, force, mass = dataset.data
     output_dims = loc.shape[-1]
 
-    loc = torch.from_numpy(loc[0][:1]).to(device).view(-1, output_dims)
+    loc = (
+        torch.from_numpy(loc[0][:1]).to(device).view(-1, output_dims)
+    )  # TODO: do this batches so that we have greater confidence
     vel = torch.from_numpy(vel[0][:1]).to(device).view(-1, output_dims)
     force = torch.from_numpy(force[0][:1]).to(device).view(-1, output_dims)
     mass = torch.from_numpy(mass[0]).to(device)
