@@ -9,6 +9,11 @@ run*/
 
 __pycache__
 
+# stuff related to generated datasets
 *.npy
+datasets/nbody/dataset/gravity/metadata.json
+
 
 segnn_runs/*
+
+.ipynb_checkpoints
