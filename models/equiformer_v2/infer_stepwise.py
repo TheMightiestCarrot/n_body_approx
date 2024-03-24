@@ -47,8 +47,12 @@ def main():
     simulation_index = 0
 
     num_steps = args.num_steps
-
     loc, vel, force, mass = dataset_train.data
+    steps_in_data = loc[simulation_index].shape[0]
+    if steps_in_data < num_steps:
+        print(f'num_steps {num_steps} is greater than steps_in_data {steps_in_data}')
+        print(f'num_steps will be set to {steps_in_data}')
+        num_steps = steps_in_data
 
     output_dims = loc.shape[-1]
     n_nodes = loc.shape[-2]
@@ -70,7 +74,7 @@ def main():
             .long()
             .to(device=device)
         )
-        pred = model(data, batch)
+        pred = model(data, batch).cpu()
     else:
         print("inferring in stepwise mode")
 
@@ -86,6 +90,7 @@ def main():
                 .long()
                 .to(device=device)
             )
+            print(f'predicting step {step}')
             step_pred = model(step_data, batch)
             predicted_loc.append(step_pred.cpu())
         pred = torch.cat(predicted_loc, dim=0)
