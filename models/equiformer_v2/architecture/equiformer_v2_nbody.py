@@ -8,17 +8,27 @@ from .base_model import BaseModel
 from .edge_rot_mat import init_edge_rot_mat
 from .gaussian_rbf import GaussianRadialBasisLayer
 from .input_block import EdgeDegreeEmbedding
-from .layer_norm import (EquivariantLayerNormArray,
-                         EquivariantLayerNormArraySphericalHarmonics,
-                         EquivariantRMSNormArraySphericalHarmonics,
-                         EquivariantRMSNormArraySphericalHarmonicsV2,
-                         get_normalization_layer)
+from .layer_norm import (
+    EquivariantLayerNormArray,
+    EquivariantLayerNormArraySphericalHarmonics,
+    EquivariantRMSNormArraySphericalHarmonics,
+    EquivariantRMSNormArraySphericalHarmonicsV2,
+    get_normalization_layer,
+)
 from .module_list import ModuleListInfo
 from .radial_function import RadialFunction
-from .so3 import (CoefficientMappingModule, SO3_Embedding, SO3_Grid,
-                  SO3_LinearV2, SO3_Rotation)
-from .transformer_block import (FeedForwardNetwork,
-                                SO2EquivariantGraphAttention, TransBlockV2)
+from .so3 import (
+    CoefficientMappingModule,
+    SO3_Embedding,
+    SO3_Grid,
+    SO3_LinearV2,
+    SO3_Rotation,
+)
+from .transformer_block import (
+    FeedForwardNetwork,
+    SO2EquivariantGraphAttention,
+    TransBlockV2,
+)
 from .utils import GaussianSmearing
 
 # Statistics of IS2RE 100K
@@ -80,7 +90,7 @@ class EquiformerV2_nbody(BaseModel):
         regress_forces=True,
         otf_graph=True,
         max_neighbors=500,
-        max_radius=99999999, # TODO: we can afford this with a small number of atoms. workaround to max radius returning empty edge index undefined behavior: if torch.min(edge_vec_0_distance) < 0.0001: RuntimeError: min(): Expected reduction dim to be specified for input.numel() == 0. Specify the reduction dim with the 'dim' argument.
+        max_radius=99999999,  # TODO: we can afford this with a small number of atoms. workaround to max radius returning empty edge index undefined behavior: if torch.min(edge_vec_0_distance) < 0.0001: RuntimeError: min(): Expected reduction dim to be specified for input.numel() == 0. Specify the reduction dim with the 'dim' argument.
         max_num_elements=90,
         num_layers=12,
         sphere_channels=128,
@@ -164,7 +174,9 @@ class EquiformerV2_nbody(BaseModel):
         self.weight_init = weight_init
         assert self.weight_init in ["normal", "uniform"]
 
-        self.device = torch.cuda.current_device() if torch.cuda.is_available() else 'cpu'
+        self.device = (
+            torch.cuda.current_device() if torch.cuda.is_available() else "cpu"
+        )
 
         self.grad_forces = False
         self.num_resolutions = len(self.lmax_list)
@@ -400,7 +412,9 @@ class EquiformerV2_nbody(BaseModel):
         ###############################################################
 
         for i in range(self.num_layers):
-            x = self.blocks[i](x, atomic_numbers, edge_distance, edge_index, batch=batch)
+            x = self.blocks[i](
+                x, atomic_numbers, edge_distance, edge_index, batch=batch
+            )
 
         # Final layer norm
         x.embedding = self.norm(x.embedding)
@@ -409,7 +423,7 @@ class EquiformerV2_nbody(BaseModel):
         # Position prediction
         ###############################################################
         # Concatenate position and velocity information
-        pos_vel = torch.cat((pos, vel), dim=1) # TODO consider using this
+        pos_vel = torch.cat((pos, vel), dim=1)  # TODO consider using this
 
         # Predict the change in position
         delta_pos = self.force_block(x, atomic_numbers, edge_distance, edge_index)
