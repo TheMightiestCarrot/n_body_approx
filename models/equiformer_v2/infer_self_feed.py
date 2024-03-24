@@ -59,7 +59,7 @@ def main():
     predicted_force = [force_initial]
     predicted_mass = [mass_initial]
 
-    for step in range(num_steps - 1):
+    for step in range(num_steps):
         print(f"Predicting step {step}")
 
         data = [
