@@ -80,7 +80,7 @@ class EquiformerV2_nbody(BaseModel):
         regress_forces=True,
         otf_graph=True,
         max_neighbors=500,
-        max_radius=5.0,
+        max_radius=99999999, # TODO: we can afford this with a small number of atoms. workaround to max radius returning empty edge index undefined behavior: if torch.min(edge_vec_0_distance) < 0.0001: RuntimeError: min(): Expected reduction dim to be specified for input.numel() == 0. Specify the reduction dim with the 'dim' argument.
         max_num_elements=90,
         num_layers=12,
         sphere_channels=128,
