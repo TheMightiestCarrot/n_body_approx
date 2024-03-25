@@ -716,6 +716,126 @@ class GravitySim(object):
 
         matplotlib.use(og_backend)
 
+    @staticmethod
+    def interactive_plotly_offline_plot(actual_pos=None, predicted_pos=None, output_file='3D_offline_plot.html', duration=8):
+        import plotly.graph_objects as go
+        import numpy as np
+
+        actual = actual_pos
+        predicted = predicted_pos
+
+        particles = actual.shape[1]
+        steps = actual.shape[0]
+
+        # Initialize the figure
+        # Creating initial plot data with both particles' initial positions
+        fig = go.Figure(
+            layout=go.Layout(
+                template='plotly_white',
+                updatemenus=[dict(type='buttons', showactive=False,
+                                  y=0,
+                                  x=1.05,
+                                  xanchor='right',
+                                  yanchor='top',
+                                  pad=dict(t=0, r=10),
+                                  buttons=[dict(label='Play',
+                                                method='animate',
+                                                args=[None, {'frame': {'duration': duration, 'redraw': True},
+                                                             'fromcurrent': True,
+                                                             'mode': 'immediate',
+                                                             'transition': {'duration': duration}}]),
+                                           dict(label='Stop',
+                                                method='animate',
+                                                args=[[None], {'frame': {'duration': 0, 'redraw': True},
+                                                               'mode': 'immediate',
+                                                               'transition': {'duration': 0}}])])],
+                sliders=[dict(steps=[dict(method='animate',
+                                          args=[[f'frame{k}'],
+                                                {'mode': 'immediate', 'frame': {'duration': duration, 'redraw': True},
+                                                 'fromcurrent': True}],
+                                          label=f'{k}') for k in range(steps)],
+                              transition={'duration': duration},
+                              x=0,
+                              y=0,
+                              currentvalue={'font': {'size': 12}, 'prefix': 'Point: ', 'visible': True},
+                              len=1.0)]
+            )
+        )
+        # fig.update_layout(transition = {'duration': 50})
+        for i in range(particles):
+            # Initial lines for trajectory visualization
+            fig.add_trace(go.Scatter3d(x=[actual[0, i, 0]], y=[actual[0, i, 1]], z=[actual[0, i, 2]],
+                                       mode='markers+lines', marker=dict(size=5, color='blue')))
+            fig.add_trace(go.Scatter3d(x=[predicted[0, i, 0]], y=[predicted[0, i, 1]], z=[predicted[0, i, 2]],
+                                       mode='markers+lines', marker=dict(size=5, color='red')))
+            # Placeholder markers for the current step
+            fig.add_trace(go.Scatter3d(x=[actual[0, i, 0]], y=[actual[0, i, 1]], z=[actual[0, i, 2]],
+                                       mode='markers', marker=dict(size=2, color='darkblue')))
+            fig.add_trace(go.Scatter3d(x=[predicted[0, i, 0]], y=[predicted[0, i, 1]], z=[predicted[0, i, 2]],
+                                       mode='markers', marker=dict(size=2, color='darkred')))
+
+        # Create frames for each step
+        frames = []
+        for k in range(1, steps):
+            start_idx = max(0, k - 15)
+            frame_data = []
+            for i in range(particles):
+                # Actual trajectory segment
+                frame_data.append(
+                    go.Scatter3d(x=actual[start_idx:k, i, 0], y=actual[start_idx:k, i, 1], z=actual[start_idx:k, i, 2],
+                                 mode='lines', line=dict(width=5, color='blue'), opacity=0.3))
+                # Predicted trajectory segment
+                frame_data.append(
+                    go.Scatter3d(x=predicted[start_idx:k, i, 0], y=predicted[start_idx:k, i, 1],
+                                 z=predicted[start_idx:k, i, 2],
+                                 mode='lines', line=dict(width=5, color='red'), opacity=0.3))
+
+                frame_data.append(
+                    go.Scatter3d(x=[actual[k, i, 0]], y=[actual[k, i, 1]], z=[actual[k, i, 2]],
+                                 mode='markers', marker=dict(size=2, color='blue'), name=f'Actual step {k}'))
+                # Marker for the predicted position at step k
+                frame_data.append(
+                    go.Scatter3d(x=[predicted[k, i, 0]], y=[predicted[k, i, 1]], z=[predicted[k, i, 2]],
+                                 mode='markers', marker=dict(size=2, color='red'), name=f'Predicted step {k}'))
+            frames.append(go.Frame(data=frame_data, name=f'frame{k}'))
+
+        fig.frames = frames
+
+        # Calculate min and max for all dimensions
+        x_min, x_max = np.min(actual[:, :, 0]), np.max(actual[:, :, 0])
+        y_min, y_max = np.min(actual[:, :, 1]), np.max(actual[:, :, 1])
+        z_min, z_max = np.min(actual[:, :, 2]), np.max(actual[:, :, 2])
+
+        # Adjust for predicted positions
+        x_min = min(x_min, np.min(predicted[:, :, 0]))
+        x_max = max(x_max, np.max(predicted[:, :, 0]))
+        y_min = min(y_min, np.min(predicted[:, :, 1]))
+        y_max = max(y_max, np.max(predicted[:, :, 1]))
+        z_min = min(z_min, np.min(predicted[:, :, 2]))
+        z_max = max(z_max, np.max(predicted[:, :, 2]))
+
+        # Calculate ranges with some padding
+        padding = 5  # Adjust padding as necessary
+        x_range = [x_min - padding, x_max + padding]
+        y_range = [y_min - padding, y_max + padding]
+        z_range = [z_min - padding, z_max + padding]
+
+        # Fix the axes ranges and ensure a fixed aspect ratio
+        fig.update_layout(scene=dict(
+            xaxis=dict(range=x_range, autorange=False),
+            yaxis=dict(range=y_range, autorange=False),
+            zaxis=dict(range=z_range, autorange=False),
+            aspectratio=dict(x=1, y=1, z=1),
+            aspectmode='cube',
+            xaxis_title='X Axis',
+            yaxis_title='Y Axis',
+            zaxis_title='Z Axis'),
+            title='N-body',
+            showlegend=False)
+
+        # Save the plot as an HTML file
+        fig.write_html(output_file)
+
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
