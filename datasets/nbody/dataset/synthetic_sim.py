@@ -559,7 +559,7 @@ class GravitySim(object):
         import traceback
         og_backend = matplotlib.get_backend()
         # if we're running in headless mode, offline_plot should be True
-        if os.environ.get('DISPLAY', '') == '':
+        if (os.environ.get('DISPLAY', '') == '') and (os.name != 'nt'):
             print('running in headless mode, setting offline_plot to True')
             offline_plot = True
 
