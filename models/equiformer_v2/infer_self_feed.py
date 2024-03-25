@@ -2,7 +2,6 @@ import glob
 import os
 
 import torch
-from torch_geometric.data import Data
 
 from datasets.nbody.dataset import synthetic_sim
 from datasets.nbody.dataset_gravity import GravityDataset
@@ -60,7 +59,7 @@ def main():
     predicted_force = [force_initial]
     predicted_mass = [mass_initial]
 
-    for step in range(num_steps - 1):
+    for step in range(num_steps):
         print(f"Predicting step {step}")
 
         data = [
@@ -80,14 +79,16 @@ def main():
         )
 
         pred = model(data, batch)
-        predicted_loc.append(pred)
+        predicted_loc.append(pred.cpu())
         predicted_vel.append(
-            torch.zeros_like(pred)
+            torch.zeros_like(pred.cpu())
         )  # TODO: Assuming vel is not predicted
         predicted_force.append(
-            torch.zeros_like(pred)
+            torch.zeros_like(pred.cpu())
         )  # Assuming force is not predicted
-        predicted_mass.append(predicted_mass[-1])  # Assuming mass remains constant
+        predicted_mass.append(
+            predicted_mass[-1].cpu()
+        )  # Assuming mass remains constant
 
     print("Finished prediction")
 
@@ -101,10 +102,9 @@ def main():
     loc_actual = (
         torch.from_numpy(loc[simulation_index][:num_steps])
         .view(-1, n_nodes, output_dims)
-        .detach()
         .numpy()
     )
-    loc_pred = predicted_loc.view(-1, n_nodes, output_dims).detach().numpy()
+    loc_pred = predicted_loc.view(-1, n_nodes, output_dims).numpy()
 
     sim.interactive_trajectory_plot_all_particles_3d(
         loc_actual, loc_pred, particle_index=None, dims=output_dims, offline_plot=False
@@ -112,4 +112,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with torch.no_grad():
+        main()

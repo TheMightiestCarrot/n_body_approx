@@ -47,8 +47,12 @@ def main():
     simulation_index = 0
 
     num_steps = args.num_steps
-
     loc, vel, force, mass = dataset_train.data
+    steps_in_data = loc[simulation_index].shape[0]
+    if steps_in_data < num_steps:
+        print(f'num_steps {num_steps} is greater than steps_in_data {steps_in_data}')
+        print(f'num_steps will be set to {steps_in_data}')
+        num_steps = steps_in_data
 
     output_dims = loc.shape[-1]
     n_nodes = loc.shape[-2]
@@ -70,14 +74,14 @@ def main():
             .long()
             .to(device=device)
         )
-        pred = model(data, batch)
+        pred = model(data, batch).cpu()
     else:
         print("inferring in stepwise mode")
 
         predicted_loc = []
         for step in range(num_steps):
             step_data = [
-                d[step * n_nodes : (step + 1) * n_nodes].to(device=device) for d in data
+                d[step * n_nodes : (step + 1) * n_nodes] for d in data
             ]
             batch_size = 1
             batch = (
@@ -86,14 +90,15 @@ def main():
                 .long()
                 .to(device=device)
             )
+            print(f'predicting step {step}')
             step_pred = model(step_data, batch)
-            predicted_loc.append(step_pred)
+            predicted_loc.append(step_pred.cpu())
         pred = torch.cat(predicted_loc, dim=0)
 
     from datasets.nbody.dataset import synthetic_sim
 
-    loc = loc.view(num_steps, n_nodes, output_dims).detach().numpy()
-    pred = pred.view(num_steps, n_nodes, output_dims).detach().numpy()
+    loc = loc.view(num_steps, n_nodes, output_dims).numpy()
+    pred = pred.view(num_steps, n_nodes, output_dims).numpy()
 
     sim = synthetic_sim.GravitySim(n_balls=5, loc_std=1)
     sim.interactive_trajectory_plot_all_particles_3d(
@@ -102,4 +107,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with torch.no_grad():
+        main()

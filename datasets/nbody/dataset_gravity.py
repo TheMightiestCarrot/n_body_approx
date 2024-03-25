@@ -56,7 +56,7 @@ class GravityDataset():
         loc, vel, force, mass = [np.load(os.path.join(path, f"{prefix}_{self.suffix}.npy")) for prefix in
                                  self.GROUND_TRUTH_FILE_PREFIXES]
 
-        self.num_nodes = loc.shape[-1]
+        self.num_nodes = loc.shape[-2]
 
         metadata_path = os.path.join(path, 'metadata.json')
         if os.path.exists(metadata_path):
