@@ -97,7 +97,7 @@ class EdgeDegreeEmbedding(torch.nn.Module):
         else:
             x_edge = edge_distance
 
-        x_edge_m_0 = self.rad_func(x_edge)
+        x_edge_m_0 = self.rad_func(x_edge.to(dtype=torch.float32))
         x_edge_m_0 = x_edge_m_0.reshape(
             -1, self.m_0_num_coefficients, self.sphere_channels
         )
