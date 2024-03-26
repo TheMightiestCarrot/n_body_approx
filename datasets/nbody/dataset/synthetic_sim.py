@@ -709,7 +709,7 @@ class GravitySim(object):
                 fps = 20
                 frames = actual_pos.shape[0] // skip_steps
                 anim = FuncAnimation(fig, update, frames=frames, blit=False)
-                
+
                 if loggers:
                     with tempfile.NamedTemporaryFile(delete=True, suffix='.mp4') as temp:
                         filename = temp.name
@@ -729,7 +729,8 @@ class GravitySim(object):
         matplotlib.use(og_backend)
 
     @staticmethod
-    def interactive_plotly_offline_plot(actual_pos=None, predicted_pos=None, output_file='3D_offline_plot.html', duration=8):
+    def interactive_plotly_offline_plot(actual_pos=None, predicted_pos=None, output_file='3D_offline_plot.html',
+                                        duration=8):
         import plotly.graph_objects as go
         import numpy as np
 
@@ -737,7 +738,7 @@ class GravitySim(object):
         predicted = predicted_pos
 
         particles = actual.shape[1]
-        steps = actual.shape[0]
+        steps = max(len(actual), len(predicted))
 
         # Initialize the figure
         # Creating initial plot data with both particles' initial positions
@@ -788,27 +789,40 @@ class GravitySim(object):
 
         # Create frames for each step
         frames = []
-        for k in range(1, steps):
+        for k in range(1, max(len(actual), len(predicted)) + 1):
             start_idx = max(0, k - 15)
             frame_data = []
             for i in range(particles):
-                # Actual trajectory segment
-                frame_data.append(
-                    go.Scatter3d(x=actual[start_idx:k, i, 0], y=actual[start_idx:k, i, 1], z=actual[start_idx:k, i, 2],
-                                 mode='lines', line=dict(width=5, color='blue'), opacity=0.3))
-                # Predicted trajectory segment
-                frame_data.append(
-                    go.Scatter3d(x=predicted[start_idx:k, i, 0], y=predicted[start_idx:k, i, 1],
-                                 z=predicted[start_idx:k, i, 2],
-                                 mode='lines', line=dict(width=5, color='red'), opacity=0.3))
+                # Determine last valid index for actual and predicted
+                actual_last_idx = min(k, len(actual)) - 1
+                predicted_last_idx = min(k, len(predicted)) - 1
 
+                # Plot actual trajectory segment up to the last available step
                 frame_data.append(
-                    go.Scatter3d(x=[actual[k, i, 0]], y=[actual[k, i, 1]], z=[actual[k, i, 2]],
-                                 mode='markers', marker=dict(size=2, color='blue'), name=f'Actual step {k}'))
-                # Marker for the predicted position at step k
+                    go.Scatter3d(x=actual[start_idx:actual_last_idx + 1, i, 0],
+                                 y=actual[start_idx:actual_last_idx + 1, i, 1],
+                                 z=actual[start_idx:actual_last_idx + 1, i, 2],
+                                 mode='lines', line=dict(width=5, color='blue'), opacity=0.3))
+                # Marker for the last available actual position
                 frame_data.append(
-                    go.Scatter3d(x=[predicted[k, i, 0]], y=[predicted[k, i, 1]], z=[predicted[k, i, 2]],
-                                 mode='markers', marker=dict(size=2, color='red'), name=f'Predicted step {k}'))
+                    go.Scatter3d(x=[actual[actual_last_idx, i, 0]], y=[actual[actual_last_idx, i, 1]],
+                                 z=[actual[actual_last_idx, i, 2]],
+                                 mode='markers', marker=dict(size=2, color='blue'),
+                                 name=f'Actual step {min(k, len(actual))}'))
+
+                # Plot predicted trajectory segment up to the last available step
+                frame_data.append(
+                    go.Scatter3d(x=predicted[start_idx:predicted_last_idx + 1, i, 0],
+                                 y=predicted[start_idx:predicted_last_idx + 1, i, 1],
+                                 z=predicted[start_idx:predicted_last_idx + 1, i, 2],
+                                 mode='lines', line=dict(width=5, color='red'), opacity=0.3))
+                # Marker for the last available predicted position
+                frame_data.append(
+                    go.Scatter3d(x=[predicted[predicted_last_idx, i, 0]], y=[predicted[predicted_last_idx, i, 1]],
+                                 z=[predicted[predicted_last_idx, i, 2]],
+                                 mode='markers', marker=dict(size=2, color='red'),
+                                 name=f'Predicted step {min(k, len(predicted))}'))
+
             frames.append(go.Frame(data=frame_data, name=f'frame{k}'))
 
         fig.frames = frames
