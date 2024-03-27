@@ -138,12 +138,13 @@ if __name__ == "__main__":
     experiment_folder = os.path.join(args.experiment_name, run_name)
     writer = SummaryWriter(experiment_folder)
 
-    loggers_list = [loggers.TensorBoardLogger(writer, None)]
+    log_manager = loggers.LoggingManager()
+    log_manager.add_logger(loggers.TensorBoardLogger(writer, None))
+    log_manager.log_text('args', ', '.join(f'{k}={v}' for k, v in vars(args).items()))
 
-    args_str = ', '.join(f'{k}={v}' for k, v in vars(args).items())
-
-    # Log the command-line arguments
-    writer.add_text('args', args_str)
+    if loggers.WandBLogger.get_api_key() is not None:
+        wandb_logger = loggers.WandBLogger(project_name=args.experiment_name, run_name=run_name, config=vars(args))
+        log_manager.add_logger(wandb_logger)
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -153,18 +154,12 @@ if __name__ == "__main__":
     if args.gpus == 1 and torch.cuda.is_available():
         print('Starting training on a single gpu...')
         args.mode = 'gpu'
-        train(0, model, args, loggers_list)
+        train(0, model, args, log_manager)
     else:
         print('Starting training on the cpu...')
         args.mode = 'cpu'
         args.gpus = 0
-        train(0, model, args, loggers_list)
+        train(0, model, args, log_manager)
 
-    for logger in loggers_list:
-        torch.save(model, os.path.join(logger.get_logdir(), "model.pth"))
-        # also save state dict
-        torch.save(model.state_dict(), os.path.join(logger.get_logdir(), "model_state_dict.pth"))
-        import json
-
-        with open(os.path.join(logger.get_logdir(), 'training_args.json'), 'w') as f:
-            json.dump({"args": vars(args)}, f, indent=4)
+    log_manager.log_model(model)
+    log_manager.finish()

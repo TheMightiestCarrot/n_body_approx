@@ -26,6 +26,12 @@ class BaseLogger:
     def finish(self):
         raise NotImplementedError
 
+    def log_text(self, tag, text):
+        raise NotImplementedError
+
+    def log_model(self, model):
+        raise NotImplementedError
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.finish()
 
@@ -69,6 +75,14 @@ class TensorBoardLogger(BaseLogger):
         # for key, value in hparams.items():
         #     if isinstance(value, (int, float)):
         #         self.writer.add_scalar(key, value)
+
+    def log_text(self, tag, text):
+        self.writer.add_text(tag, text)
+
+    def log_model(self, model):
+        import torch
+        torch.save(model, os.path.join(self.writer.get_logdir(), "model.pth"))
+        torch.save(model.state_dict(), os.path.join(self.writer.get_logdir(), "model_state_dict.pth"))
 
     def finish(self):
         pass
@@ -115,3 +129,101 @@ class WandBLogger(BaseLogger):
 
     def finish(self):
         self.wandb_run.finish()
+
+    def log_text(self, tag, text):
+        self.wandb_run.log({tag: text})
+
+    def log_model(self, model):
+        import torch
+        import tempfile
+
+        # Create temporary files for the model and its state_dict
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_model_file, tempfile.NamedTemporaryFile(
+                delete=False) as tmp_state_dict_file:
+            # Save the model and its state_dict to these temporary files
+            torch.save(model, tmp_model_file.name)
+            torch.save(model.state_dict(), tmp_state_dict_file.name)
+
+            # Create a wandb Artifact for the model
+            artifact = wandb.Artifact("model_artifact", type="model")
+            # Add the temporary files to the artifact
+            artifact.add_file(tmp_model_file.name, "model.pth")
+            artifact.add_file(tmp_state_dict_file.name, "model_state_dict.pth")
+
+            # Log the artifact to wandb
+            wandb.log_artifact(artifact)
+
+
+class LoggingManager:
+    def __init__(self, loggers=None):
+        """
+        Initializes the LoggingManager with a list of loggers.
+
+        Parameters:
+        - loggers: A list of logger instances that inherit from BaseLogger.
+        """
+        self.loggers = loggers if loggers is not None else []
+
+    def add_logger(self, logger):
+        """
+        Adds a logger to the logging manager.
+
+        Parameters:
+        - logger: An instance of a logger that should be added to the manager.
+        """
+        self.loggers.append(logger)
+
+    def log_scalar(self, tag, value, step=None):
+        """
+        Logs a scalar value across all loggers.
+
+        Parameters are passed directly to the logger's log_scalar method.
+        """
+        for logger in self.loggers:
+            logger.log_scalar(tag, value, step)
+
+    def log_histogram(self, tag, values, step):
+        """
+        Logs a histogram across all loggers.
+        """
+        for logger in self.loggers:
+            logger.log_histogram(tag, values, step)
+
+    def log_figure(self, tag, figure, step):
+        """
+        Logs a figure across all loggers.
+        """
+        for logger in self.loggers:
+            logger.log_figure(tag, figure, step)
+
+    def log_video(self, tag, video_path, step=None, fps=20):
+        """
+        Logs a video across all loggers.
+        """
+        for logger in self.loggers:
+            logger.log_video(tag, video_path, step, fps)
+
+    def log_hparams(self, hparams, loss):
+        """
+        Logs hyperparameters across all loggers.
+        """
+        for logger in self.loggers:
+            logger.log_hparams(hparams, loss)
+
+    def log_text(self, tag, text):
+        """
+        Logs text across all loggers.
+        """
+        for logger in self.loggers:
+            logger.log_text(tag, text)
+
+    def log_model(self, model):
+        for logger in self.loggers:
+            logger.log_model(model)
+
+    def finish(self):
+        """
+        Calls the finish method on all loggers to properly close them before the program terminates.
+        """
+        for logger in self.loggers:
+            logger.finish()
