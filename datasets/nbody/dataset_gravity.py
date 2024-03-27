@@ -89,9 +89,9 @@ class GravityDataset():
         if self.random_trajectory_sampling:
             min_frame = 0
             separation = self.steps_to_predict
-            max_frame = len(loc) - separation
+            max_frame = len(loc) - separation - 1
 
-            frame_0 = random.randint(min_frame, max_frame - separation)
+            frame_0 = random.randint(min_frame, max_frame)
             frame_T = frame_0 + separation
 
         else:
@@ -113,6 +113,8 @@ class GravityDataset():
             vel_dt = vel[frame_T] - vel[frame_0]  # Change in velocity
             # y = torch.cat((pos_dt, vel_dt), dim=0)
             y = np.concatenate((pos_dt, vel_dt), axis=1)
+        elif self.target == "pos+vel":
+            y = np.concatenate((loc[frame_T], vel[frame_T]), axis=1)
 
         return loc[frame_0], vel[frame_0], force[frame_0], mass, y
 
