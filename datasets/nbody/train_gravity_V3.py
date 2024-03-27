@@ -1,7 +1,6 @@
 import time
 import traceback
 import torch
-import wandb
 from e3nn.o3 import Irreps, spherical_harmonics
 from datasets.nbody.dataset_gravity import GravityDataset
 from torch import nn, optim
@@ -90,17 +89,9 @@ def train(gpu, model, args, log_manager=None):
         loss_mse = nn.MSELoss()
         transform = O3Transform(args.lmax_attr)
 
-        if args.log and gpu == 0:
-            if args.time_exp:
-                wandb.init(project="Gravity time", name=args.ID, config=args, entity="segnn")
-            else:
-                wandb.init(project="SEGNN Gravity", name=args.ID, config=args, entity="segnn")
-
         for epoch in range(0, args.epochs):
             train_loss = run_epoch(model, optimizer, loss_mse, epoch, loader_train, transform, device, args,
                                    log_manager=log_manager)
-            if args.log and gpu == 0:
-                wandb.log({"Train MSE": train_loss})
             if epoch % args.test_interval == 0 or epoch == args.epochs - 1:
                 # train(epoch, loader_train, backprop=False)
                 val_loss = run_epoch(model, optimizer, loss_mse, epoch, loader_val, transform, device, args,
@@ -108,17 +99,12 @@ def train(gpu, model, args, log_manager=None):
                                      log_manager=log_manager)
                 test_loss = run_epoch(model, optimizer, loss_mse, epoch, loader_test,
                                       transform, device, args, backprop=False, log_manager=log_manager)
-                if args.log and gpu == 0:
-                    wandb.log({"Val MSE": val_loss})
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
                     best_test_loss = test_loss
                     best_epoch = epoch
                 print("*** Best Val Loss: %.5f \t Best Test Loss: %.5f \t Best epoch %d" %
                       (best_val_loss, best_test_loss, best_epoch))
-
-        if args.log and gpu == 0:
-            wandb.log({"Test MSE": best_test_loss})
 
         log_manager.log_hparams(vars(args), best_test_loss)
 
@@ -182,8 +168,6 @@ def run_epoch(model, optimizer, criterion, epoch, loader, transform, device, arg
 
             if epoch % 100 == 99:
                 print("Forward average time: %.6f" % (time_exp_dic['time'] / time_exp_dic['counter']))
-                if args.log:
-                    wandb.log({"Time": time_exp_dic['time'] / time_exp_dic['counter']})
         loss = criterion(pred, graph.y)
 
         if calculate_pos_and_vel_loss:
