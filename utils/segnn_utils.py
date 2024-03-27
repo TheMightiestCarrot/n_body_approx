@@ -13,6 +13,7 @@ def create_argparser():
     parser = argparse.ArgumentParser()
 
     # Run parameters
+    parser.add_argument('--experiment_name', type=str, default='segnn_runs')
     parser.add_argument('--epochs', type=int, default=1000,
                         help='number of epochs')
     parser.add_argument('--batch_size', type=int, default=128,
@@ -29,6 +30,8 @@ def create_argparser():
                         help='Num workers in dataloader')
     parser.add_argument('--save_dir', type=str, default="saved models",
                         help='Directory in which to save models')
+    parser.add_argument('--seed', type=int, default=42,
+                        help='Seed for the training.')
 
     # Data parameters
     parser.add_argument('--dataset', type=str, default="qm9",
@@ -61,6 +64,12 @@ def create_argparser():
     # Gravity parameters:
     parser.add_argument('--neighbours', type=int, default=6,
                         help='Number of connected nearest neighbours')
+    parser.add_argument('--steps_to_predict', type=int, default=2,
+                        help='Number of steps to predict')
+    parser.add_argument('--random_trajectory_sampling', type=bool, default=True,
+                        help='Whether to use any steps in the training data')
+    parser.add_argument('--use_force', type=bool, default=False,
+                        help='Whether to also use ')
 
     # Model parameters
     parser.add_argument('--model', type=str, default="segnn",

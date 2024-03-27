@@ -31,17 +31,20 @@ class BaseLogger:
 
 
 class TensorBoardLogger(BaseLogger):
-    def __init__(self, writer):
+    DEFAULT_LAYOUT = {
+        "Losses": {
+            "Last Losses": ["Multiline", ["Loss/last_both", "Loss/last_pos", "Loss/last_vel"]],
+            "Average Losses": ["Multiline", ["Loss/avg_both", "Loss/avg_pos", "Loss/avg_vel"]],
+            "% Losses": ["Multiline",
+                         ["Loss/perc_pos", "Loss/perc_vel", "Loss/perc_pos_vs_vel_l1", "Loss/perc_pos_vs_vel_l2"]],
+        },
+    }
+
+    def __init__(self, writer, layout=DEFAULT_LAYOUT):
         self.writer = writer
-        layout = {
-            "Losses": {
-                "Last Losses": ["Multiline", ["Loss/last_both", "Loss/last_pos", "Loss/last_vel"]],
-                "Average Losses": ["Multiline", ["Loss/avg_both", "Loss/avg_pos", "Loss/avg_vel"]],
-                "% Losses": ["Multiline",
-                             ["Loss/perc_pos", "Loss/perc_vel", "Loss/perc_pos_vs_vel_l1", "Loss/perc_pos_vs_vel_l2"]],
-            },
-        }
-        self.writer.add_custom_scalars(layout)
+
+        if layout is not None:
+            self.writer.add_custom_scalars(layout)
 
     def log_scalar(self, tag, value, step=None):
         self.writer.add_scalar(tag, value, step)
@@ -57,15 +60,15 @@ class TensorBoardLogger(BaseLogger):
 
     def log_video(self, tag, video_path, step=None, fps=20):
         _, ext = os.path.splitext(video_path)
-        destination_file_path = os.path.join(self.get_logdir(), f"{tag.replace('/','_')}{ext}")
+        destination_file_path = os.path.join(self.get_logdir(), f"{tag.replace('/', '_')}{ext}")
 
         shutil.copyfile(video_path, destination_file_path)
 
     def log_hparams(self, hparams, loss):
         self.writer.add_hparams(hparams, {'loss': loss})
-        for key, value in hparams.items():
-            if isinstance(value, (int, float)):
-                self.writer.add_scalar(key, value)
+        # for key, value in hparams.items():
+        #     if isinstance(value, (int, float)):
+        #         self.writer.add_scalar(key, value)
 
     def finish(self):
         pass
