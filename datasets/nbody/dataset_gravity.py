@@ -215,10 +215,11 @@ class GravityDataset():
 
         return np.array(energies)
 
-    def plot_energy_statistics(self, loc, vel, force=None, mass=None):
+    def plot_energy_statistics(self, loc, vel, force=None, mass=None, log_manager=None, epoch=0, offline_plot=False):
+
         energies_array = self.get_energies_async(loc, vel, mass)
 
-        plt.figure(figsize=(14, 8))
+        fig = plt.figure(figsize=(14, 8))
         colors = {'Kinetic Energy': 'red', 'Potential Energy': 'blue', 'Total Energy': 'green'}
         energy_labels = ['Kinetic Energy', 'Potential Energy', 'Total Energy']
 
@@ -240,7 +241,13 @@ class GravityDataset():
         plt.legend()
         plt.grid(True)
         plt.tight_layout()
-        plt.show()
+
+        if log_manager:
+            import copy
+            tag = 'Energies'
+            log_manager.log_figure(tag, copy.deepcopy(fig), epoch)
+
+        plt.show()  # this has to be called after logging
 
     def plot_energy_distributions_across_all_sims(self, loc, vel, force=None, mass=None, bins=50):
         energies_array = self.get_energies_async(loc, vel, mass)
