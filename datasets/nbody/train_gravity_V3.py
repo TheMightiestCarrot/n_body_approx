@@ -1,7 +1,6 @@
 import time
-
+import traceback
 import torch
-import wandb
 from e3nn.o3 import Irreps, spherical_harmonics
 from datasets.nbody.dataset_gravity import GravityDataset
 from torch import nn, optim
@@ -53,75 +52,77 @@ class O3Transform:
         return graph
 
 
-def train(gpu, model, args, loggers=()):
-    if args.gpus == 0:
-        device = 'cpu'
-    else:
-        device = torch.device('cuda:' + str(gpu))
-
-    model = model.to(device)
-
-    dataset_train = GravityDataset(partition='train', dataset_name=args.nbody_name,
-                                   max_samples=args.max_samples, neighbours=args.neighbours, target=args.target,
-                                   steps_to_predict=args.steps_to_predict,
-                                   random_trajectory_sampling=args.random_trajectory_sampling)
-    loader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, drop_last=True)
-
-    dataset_val = GravityDataset(partition='val', dataset_name=args.nbody_name,
-                                 max_samples=args.max_samples, neighbours=args.neighbours, target=args.target,
-                                 steps_to_predict=args.steps_to_predict,
-                                 random_trajectory_sampling=args.random_trajectory_sampling)
-    loader_val = torch.utils.data.DataLoader(dataset_val, batch_size=args.batch_size, shuffle=False, drop_last=False)
-
-    dataset_test = GravityDataset(partition='test', dataset_name=args.nbody_name,
-                                  max_samples=args.max_samples, neighbours=args.neighbours, target=args.target,
-                                  steps_to_predict=args.steps_to_predict,
-                                  random_trajectory_sampling=args.random_trajectory_sampling)
-    loader_test = torch.utils.data.DataLoader(dataset_test, batch_size=args.batch_size, shuffle=False, drop_last=False)
-
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    loss_mse = nn.MSELoss()
-    transform = O3Transform(args.lmax_attr)
-
-    if args.log and gpu == 0:
-        if args.time_exp:
-            wandb.init(project="Gravity time", name=args.ID, config=args, entity="segnn")
-        else:
-            wandb.init(project="SEGNN Gravity", name=args.ID, config=args, entity="segnn")
-
+def train(gpu, model, args, log_manager=None):
     best_val_loss = 1e8
     best_test_loss = 1e8
     best_epoch = 0
-    for epoch in range(0, args.epochs):
-        train_loss = run_epoch(model, optimizer, loss_mse, epoch, loader_train, transform, device, args,
-                               loggers=loggers)
-        if args.log and gpu == 0:
-            wandb.log({"Train MSE": train_loss})
-        if epoch % args.test_interval == 0 or epoch == args.epochs - 1:
-            # train(epoch, loader_train, backprop=False)
-            val_loss = run_epoch(model, optimizer, loss_mse, epoch, loader_val, transform, device, args, backprop=False,
-                                 loggers=loggers)
-            test_loss = run_epoch(model, optimizer, loss_mse, epoch, loader_test,
-                                  transform, device, args, backprop=False, loggers=loggers)
-            if args.log and gpu == 0:
-                wandb.log({"Val MSE": val_loss})
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                best_test_loss = test_loss
-                best_epoch = epoch
-            print("*** Best Val Loss: %.5f \t Best Test Loss: %.5f \t Best epoch %d" %
-                  (best_val_loss, best_test_loss, best_epoch))
+    try:
+        if args.gpus == 0:
+            device = 'cpu'
+        else:
+            device = torch.device('cuda:' + str(gpu))
 
-    if args.log and gpu == 0:
-        wandb.log({"Test MSE": best_test_loss})
+        model = model.to(device)
 
-    for lg in loggers:
-        lg.log_hparams(vars(args), best_test_loss)
+        dataset_train = GravityDataset(partition='train', dataset_name=args.nbody_name,
+                                       max_samples=args.max_samples, neighbours=args.neighbours, target=args.target,
+                                       steps_to_predict=args.steps_to_predict,
+                                       random_trajectory_sampling=args.random_trajectory_sampling)
+        loader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True,
+                                                   drop_last=True)
+
+        dataset_val = GravityDataset(partition='val', dataset_name=args.nbody_name,
+                                     max_samples=args.max_samples, neighbours=args.neighbours, target=args.target,
+                                     steps_to_predict=args.steps_to_predict,
+                                     random_trajectory_sampling=args.random_trajectory_sampling)
+        loader_val = torch.utils.data.DataLoader(dataset_val, batch_size=args.batch_size, shuffle=False,
+                                                 drop_last=False)
+
+        dataset_test = GravityDataset(partition='test', dataset_name=args.nbody_name,
+                                      max_samples=args.max_samples, neighbours=args.neighbours, target=args.target,
+                                      steps_to_predict=args.steps_to_predict,
+                                      random_trajectory_sampling=args.random_trajectory_sampling)
+        loader_test = torch.utils.data.DataLoader(dataset_test, batch_size=args.batch_size, shuffle=False,
+                                                  drop_last=False)
+
+        optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+        loss_mse = nn.MSELoss()
+        transform = O3Transform(args.lmax_attr)
+
+        for epoch in range(0, args.epochs):
+            train_loss = run_epoch(model, optimizer, loss_mse, epoch, loader_train, transform, device, args,
+                                   log_manager=log_manager)
+            if epoch % args.test_interval == 0 or epoch == args.epochs - 1:
+                # train(epoch, loader_train, backprop=False)
+                val_loss = run_epoch(model, optimizer, loss_mse, epoch, loader_val, transform, device, args,
+                                     backprop=False,
+                                     log_manager=log_manager)
+                test_loss = run_epoch(model, optimizer, loss_mse, epoch, loader_test,
+                                      transform, device, args, backprop=False, log_manager=log_manager)
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    best_test_loss = test_loss
+                    best_epoch = epoch
+                print("*** Best Val Loss: %.5f \t Best Test Loss: %.5f \t Best epoch %d" %
+                      (best_val_loss, best_test_loss, best_epoch))
+
+        log_manager.log_hparams(vars(args), best_test_loss)
+
+    except KeyboardInterrupt:
+        print("Keyboard interrupt, saving logs and model state.")
+        pass
+    except Exception as e:
+        print("Error occurred, saving logs and model state.")
+        traceback.print_exc()
+        log_manager.log_text("ERROR", traceback.format_exc())
+
+    if args.log_dataset:
+        log_manager.log_path("gravity_data", dataset_train.path, "dataset")
 
     return best_val_loss, best_test_loss, best_epoch
 
 
-def run_epoch(model, optimizer, criterion, epoch, loader, transform, device, args, backprop=True, loggers=()):
+def run_epoch(model, optimizer, criterion, epoch, loader, transform, device, args, backprop=True, log_manager=None):
     if backprop:
         model.train()
     else:
@@ -170,8 +171,6 @@ def run_epoch(model, optimizer, criterion, epoch, loader, transform, device, arg
 
             if epoch % 100 == 99:
                 print("Forward average time: %.6f" % (time_exp_dic['time'] / time_exp_dic['counter']))
-                if args.log:
-                    wandb.log({"Time": time_exp_dic['time'] / time_exp_dic['counter']})
         loss = criterion(pred, graph.y)
 
         if calculate_pos_and_vel_loss:
@@ -244,15 +243,14 @@ def run_epoch(model, optimizer, criterion, epoch, loader, transform, device, arg
         print(f"  Velocity:\t\t{avg_metrics['perc_error_vel']:.2f}%\n")
         print(f"  Position vs Velocity:\t\t{avg_metrics['perc_error_pos_vs_vel']:.2f}%\n")
 
-    for logger in loggers:
-        logger.log_scalar(f'{loader.dataset.partition}/loss', res['loss'] / res['counter'], epoch)
-        if calculate_pos_and_vel_loss:
-            logger.log_scalar(f'{loader.dataset.partition}/pos', avg_metrics["loss_pos"], epoch)
-            logger.log_scalar(f'{loader.dataset.partition}/vel', avg_metrics["loss_vel"], epoch)
+    log_manager.log_scalar(f'{loader.dataset.partition}/loss', res['loss'] / res['counter'], epoch)
+    if calculate_pos_and_vel_loss:
+        log_manager.log_scalar(f'{loader.dataset.partition}/pos', avg_metrics["loss_pos"], epoch)
+        log_manager.log_scalar(f'{loader.dataset.partition}/vel', avg_metrics["loss_vel"], epoch)
 
-            logger.log_scalar(f'{loader.dataset.partition}/perc_pos', avg_metrics["perc_error_pos"], epoch)
-            logger.log_scalar(f'{loader.dataset.partition}/perc_vel', avg_metrics["perc_error_vel"], epoch)
-            logger.log_scalar(f'{loader.dataset.partition}/perc_pos_vs_vel', avg_metrics["perc_error_pos_vs_vel"],
-                              epoch)
+        log_manager.log_scalar(f'{loader.dataset.partition}/perc_pos', avg_metrics["perc_error_pos"], epoch)
+        log_manager.log_scalar(f'{loader.dataset.partition}/perc_vel', avg_metrics["perc_error_vel"], epoch)
+        log_manager.log_scalar(f'{loader.dataset.partition}/perc_pos_vs_vel', avg_metrics["perc_error_pos_vs_vel"],
+                               epoch)
 
     return res['loss'] / res['counter']
