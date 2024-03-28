@@ -32,6 +32,8 @@ def create_argparser():
                         help='Directory in which to save models')
     parser.add_argument('--seed', type=int, default=42,
                         help='Seed for the training.')
+    parser.add_argument('--log_dataset', type=bool, default=False,
+                        help='Whether to save the dataset after training.')
 
     # Data parameters
     parser.add_argument('--dataset', type=str, default="qm9",
@@ -120,8 +122,16 @@ def simulate_one_index(args_tuple):
         # Model prediction
         prediction = model(graph).cpu().detach().numpy()
         delta_loc, delta_vel = prediction[:, :output_dims], prediction[:, output_dims:]
-        loc = loc + torch.from_numpy(delta_loc).to(device)
-        vel = vel + torch.from_numpy(delta_vel).to(device)
+
+        if args.target == "pos_dt+vel_dt":
+            loc = loc + torch.from_numpy(delta_loc).to(device)
+            vel = vel + torch.from_numpy(delta_vel).to(device)
+        elif args.target == "pos+vel":
+            loc = torch.from_numpy(delta_loc).to(device)
+            vel = torch.from_numpy(delta_vel).to(device)
+        else:
+            raise Exception("Wrong target:"+args.target)
+
 
         # Update force
         force = simulation_instance.compute_force(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
@@ -207,8 +217,14 @@ def self_feed_stepwise_prediction(model, data, simulation_instance, args, device
             delta_loc, delta_vel = prediction[:, :output_dims], prediction[:, output_dims:]
 
             # Update position and velocity
-            loc = loc + torch.from_numpy(delta_loc).to(device)
-            vel = vel + torch.from_numpy(delta_vel).to(device)
+            if args.target == "pos_dt+vel_dt":
+                loc = loc + torch.from_numpy(delta_loc).to(device)
+                vel = vel + torch.from_numpy(delta_vel).to(device)
+            elif args.target == "pos+vel":
+                loc = torch.from_numpy(delta_loc).to(device)
+                vel = torch.from_numpy(delta_vel).to(device)
+            else:
+                raise Exception("Wrong target:"+args.target)
 
             force = simulation_instance.compute_force(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
                                                       simulation_instance.interaction_strength,
@@ -260,8 +276,14 @@ def self_feed_batch_prediction(model, data, simulation_instance, args, device,
         delta_loc, delta_vel = prediction[:, :output_dims], prediction[:, output_dims:]
 
         # Update position and velocity
-        loc = loc + torch.from_numpy(delta_loc).to(device)
-        vel = vel + torch.from_numpy(delta_vel).to(device)
+        if args.target == "pos_dt+vel_dt":
+            loc = loc + torch.from_numpy(delta_loc).to(device)
+            vel = vel + torch.from_numpy(delta_vel).to(device)
+        elif args.target == "pos+vel":
+            loc = torch.from_numpy(delta_loc).to(device)
+            vel = torch.from_numpy(delta_vel).to(device)
+        else:
+            raise Exception("Wrong target:"+args.target)
 
         force = simulation_instance.compute_force(loc.cpu().detach().numpy(), mass.cpu().detach().numpy(),
                                                   simulation_instance.interaction_strength,

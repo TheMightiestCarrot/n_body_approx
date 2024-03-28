@@ -707,7 +707,7 @@ class GravitySim(object):
                 import tempfile
                 from matplotlib.animation import FuncAnimation
                 fps = 20
-                frames = actual_pos.shape[0] // skip_steps
+                frames = slider_max // skip_steps
                 anim = FuncAnimation(fig, update, frames=frames, blit=False)
 
                 if loggers:

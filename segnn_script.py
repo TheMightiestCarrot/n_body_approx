@@ -34,11 +34,11 @@ if __name__ == "__main__":
     # ]
 
     sys.argv = [
-        'main.py', '--experiment_name=segnn_runs_v2', '--dataset=gravityV3', '--epochs=500', '--max_samples=10',
+        'main.py', '--experiment_name=segnn_runs_v2', '--dataset=gravityV3', '--epochs=10', '--max_samples=10',
         '--model=segnn', '--lmax_h=1', '--lmax_attr=1', '--layers=4',
         '--hidden_features=64', '--subspace_type=weightbalanced', '--norm=none',
         '--batch_size=10', '--gpu=1', '--weight_decay=1e-12', '--target=pos+vel',
-        '--random_trajectory_sampling=True'
+        '--random_trajectory_sampling=True', '--log_dataset=True'
     ]
 
     # sys.argv = [
@@ -140,11 +140,12 @@ if __name__ == "__main__":
 
     log_manager = loggers.LoggingManager()
     log_manager.add_logger(loggers.TensorBoardLogger(writer, None))
-    log_manager.log_text('args', ', '.join(f'{k}={v}' for k, v in vars(args).items()))
 
     if loggers.WandBLogger.get_api_key() is not None:
-        wandb_logger = loggers.WandBLogger(project_name=args.experiment_name, run_name=run_name, config=vars(args))
+        wandb_logger = loggers.WandBLogger(project_name=args.experiment_name, run_name=run_name)
         log_manager.add_logger(wandb_logger)
+
+    log_manager.log_args(args)
 
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -162,4 +163,5 @@ if __name__ == "__main__":
         train(0, model, args, log_manager)
 
     log_manager.log_model(model)
+
     log_manager.finish()

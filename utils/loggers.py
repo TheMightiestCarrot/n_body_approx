@@ -32,6 +32,12 @@ class BaseLogger:
     def log_model(self, model):
         raise NotImplementedError
 
+    def log_path(self, tag, path, type=None):
+        raise NotImplementedError
+
+    def log_args(self, args):
+        raise NotImplementedError
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.finish()
 
@@ -67,8 +73,7 @@ class TensorBoardLogger(BaseLogger):
     def log_video(self, tag, video_path, step=None, fps=20):
         _, ext = os.path.splitext(video_path)
         destination_file_path = os.path.join(self.get_logdir(), f"{tag.replace('/', '_')}{ext}")
-
-        shutil.copyfile(video_path, destination_file_path)
+        self.log_path(None, destination_file_path)
 
     def log_hparams(self, hparams, loss):
         self.writer.add_hparams(hparams, {'loss': loss})
@@ -83,6 +88,21 @@ class TensorBoardLogger(BaseLogger):
         import torch
         torch.save(model, os.path.join(self.writer.get_logdir(), "model.pth"))
         torch.save(model.state_dict(), os.path.join(self.writer.get_logdir(), "model_state_dict.pth"))
+
+    def log_path(self, tag, path, type=None):
+        destination_path = os.path.join(self.get_logdir(), os.path.basename(path))
+
+        if os.path.isfile(path):
+            shutil.copyfile(path, destination_path)
+        elif os.path.isdir(path):
+            shutil.copytree(path, destination_path)
+
+    def log_args(self, args):
+        import json
+        args_dict = vars(args) if not isinstance(args, dict) else args
+        self.log_text('args', ', '.join(f'{k}={v}' for k, v in args_dict.items()))
+        with open(os.path.join(self.get_logdir(), 'training_args.json'), 'w') as f:
+            json.dump({"args": args_dict}, f, indent=4)
 
     def finish(self):
         pass
@@ -120,8 +140,8 @@ class WandBLogger(BaseLogger):
     def log_figure(self, tag, figure, step):
         self.wandb_run.log({tag: [wandb.Image(figure, caption=tag)], 'epoch': step})
 
-    def log_video(self, tag, video_path, step=None, fps=20):
-        self.wandb_run.log({tag: wandb.Video(video_path, fps=fps, format="mp4"), 'epoch': step})
+    def log_video(self, tag, path, step=None, fps=20):
+        self.wandb_run.log({tag: wandb.Video(path, fps=fps, format="mp4"), 'epoch': step})
 
     def log_hparams(self, hparams, loss):
         # already implemented in config on init
@@ -153,67 +173,68 @@ class WandBLogger(BaseLogger):
             # Log the artifact to wandb
             wandb.log_artifact(artifact)
 
+    def log_path(self, tag, path, type=None):
+        if type == "dataset":
+            print("Logging datasets is disabled in wandb. If you want to manually disable this check change the type.")
+            return
+
+        artifact = None
+        if os.path.isfile(path):
+            artifact = wandb.Artifact(name=tag, type=type)
+            artifact.add_file(path)
+        elif os.path.isdir(path):
+            artifact = wandb.Artifact(name=tag, type=type)
+            artifact.add_dir(path)
+
+        self.wandb_run.log_artifact(artifact)
+
+    def log_args(self, args):
+        import json
+        import tempfile
+        import os
+
+        args_dict = vars(args) if not isinstance(args, dict) else args
+        self.wandb_run.config.update(args_dict, allow_val_change=True)
+
+        with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as tmp:
+            json.dump({"args": args_dict}, tmp, indent=4)
+            tmp_path = tmp.name  # Save the path to delete the file later
+
+        # Use the temporary file path after closing the file
+        self.log_path("training_args", tmp_path, "args")
+
+        # Manually delete the temporary file
+        os.remove(tmp_path)
+
 
 class LoggingManager:
     def __init__(self, loggers=None):
-        """
-        Initializes the LoggingManager with a list of loggers.
-
-        Parameters:
-        - loggers: A list of logger instances that inherit from BaseLogger.
-        """
         self.loggers = loggers if loggers is not None else []
 
     def add_logger(self, logger):
-        """
-        Adds a logger to the logging manager.
-
-        Parameters:
-        - logger: An instance of a logger that should be added to the manager.
-        """
         self.loggers.append(logger)
 
     def log_scalar(self, tag, value, step=None):
-        """
-        Logs a scalar value across all loggers.
-
-        Parameters are passed directly to the logger's log_scalar method.
-        """
         for logger in self.loggers:
             logger.log_scalar(tag, value, step)
 
     def log_histogram(self, tag, values, step):
-        """
-        Logs a histogram across all loggers.
-        """
         for logger in self.loggers:
             logger.log_histogram(tag, values, step)
 
     def log_figure(self, tag, figure, step):
-        """
-        Logs a figure across all loggers.
-        """
         for logger in self.loggers:
             logger.log_figure(tag, figure, step)
 
     def log_video(self, tag, video_path, step=None, fps=20):
-        """
-        Logs a video across all loggers.
-        """
         for logger in self.loggers:
             logger.log_video(tag, video_path, step, fps)
 
     def log_hparams(self, hparams, loss):
-        """
-        Logs hyperparameters across all loggers.
-        """
         for logger in self.loggers:
             logger.log_hparams(hparams, loss)
 
     def log_text(self, tag, text):
-        """
-        Logs text across all loggers.
-        """
         for logger in self.loggers:
             logger.log_text(tag, text)
 
@@ -221,9 +242,14 @@ class LoggingManager:
         for logger in self.loggers:
             logger.log_model(model)
 
+    def log_path(self, tag, path, type=None):
+        for logger in self.loggers:
+            logger.log_path(tag, path, type)
+
+    def log_args(self, args):
+        for logger in self.loggers:
+            logger.log_args(args)
+
     def finish(self):
-        """
-        Calls the finish method on all loggers to properly close them before the program terminates.
-        """
         for logger in self.loggers:
             logger.finish()

@@ -116,6 +116,9 @@ def train(gpu, model, args, log_manager=None):
         traceback.print_exc()
         log_manager.log_text("ERROR", traceback.format_exc())
 
+    if args.log_dataset:
+        log_manager.log_path("gravity_data", dataset_train.path, "dataset")
+
     return best_val_loss, best_test_loss, best_epoch
 
 
